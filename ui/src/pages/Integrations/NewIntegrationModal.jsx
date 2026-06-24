@@ -87,6 +87,7 @@ export default function IntegrationProfileModal(params) {
             <option value="webdav">WebDAV</option>
             <option value="dropbox">Dropbox</option>
             <option value="webhook">Messaging webhook</option>
+            <option value="ics">ICS Calendar</option>
           </Form.Select>
           <Form.Check
             className="mb-2"
@@ -102,6 +103,24 @@ export default function IntegrationProfileModal(params) {
             onChange={({ target }) => setIntegrationForm({ ...integrationForm, [target.name]: target.checked })}
             label="Mark folder as read-only"
           />
+
+          {integrationForm.provider === "ics" && (
+            <>
+              <Form.Label>ICS URL</Form.Label>
+              <Form.Control
+                placeholder="https://example.com/calendar.ics"
+                value={integrationForm.address}
+                name="address"
+                onChange={handleChange}
+              />
+              <Form.Check
+                name="insecure"
+                checked={integrationForm.insecure}
+                onChange={({ target }) => setIntegrationForm({ ...integrationForm, [target.name]: target.checked })}
+                label="Ignore TLS certificate errors"
+              />
+            </>
+          )}
 
           {(integrationForm.provider === "webdav" || integrationForm.provider === "ftp") && (
             <>

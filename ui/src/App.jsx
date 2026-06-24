@@ -8,6 +8,7 @@ import Role from "./common/Role";
 import { PrivateRoute } from "./components/PrivateRoute";
 import Navigationbar from "./components/Navigation";
 import SuBanner from "./components/SuBanner";
+import PasscodeResets from "./components/PasscodeResets";
 
 import Login from "./pages/Login";
 import Home from "./pages/Home";
@@ -18,6 +19,7 @@ import Integrations from "./pages/Integrations";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import Logout from "./pages/Logout";
+import ScreenShare from "./pages/ScreenShare";
 import NoMatch from "./pages/404";
 
 import "react-toastify/dist/ReactToastify.css";
@@ -37,6 +39,7 @@ export default function App() {
           <div style={{display: "flex", flexDirection: "column", height: "100%"}}>
             <Navigationbar />
             <SuBanner />
+            <PasscodeResets />
             <div style={{flex: "1 1 auto", minHeight: 0, overflow: "hidden"}}>
               <Switch>
                 <PrivateRoute exact path="/" component={Home} />
@@ -47,6 +50,7 @@ export default function App() {
                 <PrivateRoute path="/pair" component={Connect} />
                 <PrivateRoute path="/integrations" component={Integrations} />
                 <PrivateRoute path="/profile" component={Profile} />
+                <PrivateRoute path="/screenshare" component={ScreenShare} />
                 <PrivateRoute path="/admin" roles={[Role.Admin]} component={Admin} />
                 <Route path="/logout" component={Logout} />
 

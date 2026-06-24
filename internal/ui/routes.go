@@ -62,6 +62,12 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("newcode/status", app.newCodeStatus)
 	auth.GET("devices", app.listRegisteredDevices)
 	auth.POST("devices/reissue", app.reissueRegisteredDevice)
+
+	// passcode (PIN) reset approval
+	auth.GET("passcode/resets", app.listPasscodeResets)
+	auth.POST("passcode/resets/:uuid/approve", app.approvePasscodeReset)
+	auth.DELETE("passcode/resets/:uuid", app.dismissPasscodeReset)
+
 	// auth.GET("profile", app.newCode)
 	auth.POST("profile", app.changePassword)
 	// auth.POST("changeEmail", app.changePassword)
@@ -98,6 +104,13 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("integrations/:intid/metadata/*path", app.getMetadataIntegration)
 	auth.GET("integrations/:intid/download/*path", app.downloadThroughIntegration)
 	auth.POST("su/leave", app.leaveSu)
+
+	ss := auth.Group("screenshare")
+	ss.GET("room", app.screenshareJoinActive)
+	ss.GET("room/:roomId", app.screenshareGetRoom)
+	ss.GET("offer", app.screenshareGetOffer)
+	ss.POST("room/:roomId/answer", app.screenshareSendAnswer)
+	ss.DELETE("room/:roomId", app.screenshareDeleteRoom)
 
 	//admin
 	admin := auth.Group("")

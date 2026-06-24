@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
+	"github.com/ddvk/rmfakecloud/internal/app/passcodestore"
 	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/config"
 	"github.com/ddvk/rmfakecloud/internal/messages"
+	"github.com/ddvk/rmfakecloud/internal/screenshare"
 	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
@@ -77,6 +79,11 @@ type notificationHub interface {
 // DeviceTokenIssuer signs a device API JWT (same claims as POST /token/json/2/device/new).
 type DeviceTokenIssuer func(uid, deviceID, deviceDesc string) (token string, err error)
 
+type mqttBridge interface {
+	PublishSignaling(userID, clientID string, payload []byte)
+	HasConnectedClient(userID string) bool
+}
+
 // ReactAppWrapper encapsulates an app
 type ReactAppWrapper struct {
 	fs               http.FileSystem
@@ -85,8 +92,11 @@ type ReactAppWrapper struct {
 	userStorer       storage.UserStorer
 	codeConnector    codeGenerator
 	h                *hub.Hub
+	passcodeStore    passcodestore.Store
 	backends         map[common.SyncVersion]backend
 	issueDeviceToken DeviceTokenIssuer
+	roomManager      *screenshare.RoomManager
+	mqtt             mqttBridge
 }
 
 // hack for serving index.html on /
@@ -98,9 +108,12 @@ func New(cfg *config.Config,
 	userStorer storage.UserStorer,
 	codeConnector codeGenerator,
 	h *hub.Hub,
+	pcStore passcodestore.Store,
 	docHandler documentHandler,
 	blobHandler blobHandler,
-	issueDeviceToken DeviceTokenIssuer) *ReactAppWrapper {
+	issueDeviceToken DeviceTokenIssuer,
+	roomManager *screenshare.RoomManager,
+	mqttBroker mqttBridge) *ReactAppWrapper {
 
 	sub, err := fs.Sub(webui.Assets, jsBuildFolder)
 	if err != nil {
@@ -122,11 +135,14 @@ func New(cfg *config.Config,
 		userStorer:       userStorer,
 		codeConnector:    codeConnector,
 		h:                h,
+		passcodeStore:    pcStore,
 		issueDeviceToken: issueDeviceToken,
 		backends: map[common.SyncVersion]backend{
 			common.Sync10: backend10,
 			common.Sync15: backend15,
 		},
+		roomManager: roomManager,
+		mqtt:        mqttBroker,
 	}
 	return &staticWrapper
 }

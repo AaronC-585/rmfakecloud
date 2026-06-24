@@ -43,6 +43,7 @@ class ApiServices {
     }
     const user = jwtDecode(text);
     localStorage.setItem("currentUser", JSON.stringify(user));
+    localStorage.setItem("authToken", text);
     return user;
   }
   suAs(userid) {
@@ -133,6 +134,28 @@ class ApiServices {
       }
       return r.json();
     });
+  }
+
+  listPasscodeResets() {
+    return fetch(`${constants.ROOT_URL}/passcode/resets`, {
+      method: "GET",
+      headers: this.header(),
+    }).then((r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  approvePasscodeReset(uuid) {
+    return fetch(`${constants.ROOT_URL}/passcode/resets/${uuid}/approve`, {
+      method: "POST",
+      headers: this.header(),
+    }).then((r) => handleError(r));
+  }
+  dismissPasscodeReset(uuid) {
+    return fetch(`${constants.ROOT_URL}/passcode/resets/${uuid}`, {
+      method: "DELETE",
+      headers: this.header(),
+    }).then((r) => handleError(r));
   }
 
   resetPassword(resetPasswordForm) {
@@ -377,6 +400,7 @@ class ApiServices {
 
 function removeUser(){
   localStorage.removeItem("currentUser");
+  localStorage.removeItem("authToken");
 }
 function handleError(r) {
   if (!r.ok) {
