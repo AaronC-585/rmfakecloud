@@ -91,6 +91,8 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("integrations/:intid/download/*path", app.downloadThroughIntegration)
 
 	auth.GET("newcode/status", app.newCodeStatus)
+	auth.GET("devices", app.listRegisteredDevices)
+	auth.POST("devices/reissue", app.reissueRegisteredDevice)
 	auth.GET("documents/:docid/template", app.getTemplate)
 	auth.GET("templates/:id", app.getBuiltinTemplate)
 	auth.GET("methods/:id", app.getBuiltinMethod)

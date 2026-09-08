@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -911,6 +912,81 @@ func (app *ReactAppWrapper) newCodeStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"valid": true, "expiresAt": expiresAt.Unix()})
+}
+
+func (app *ReactAppWrapper) listRegisteredDevices(c *gin.Context) {
+	uid := userID(c)
+	user, err := app.userStorer.GetUser(uid)
+	if err != nil || user == nil {
+		log.Error(uiLogger, "list devices: ", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, viewmodel.NewErrorResponse("unable to load profile"))
+		return
+	}
+	out := make([]viewmodel.RegisteredDeviceEntry, 0, len(user.RegisteredDevices))
+	for _, d := range user.RegisteredDevices {
+		out = append(out, toVMRegisteredDevice(d))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].LastSeen > out[j].LastSeen
+	})
+	c.JSON(http.StatusOK, viewmodel.RegisteredDevicesResponse{Devices: out})
+}
+
+func (app *ReactAppWrapper) reissueRegisteredDevice(c *gin.Context) {
+	if app.issueDeviceToken == nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, viewmodel.NewErrorResponse("device token signing not configured"))
+		return
+	}
+	var req viewmodel.ReissueDeviceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badReq(c, err.Error())
+		return
+	}
+	uid := userID(c)
+	user, err := app.userStorer.GetUser(uid)
+	if err != nil || user == nil {
+		log.Error(uiLogger, "reissue device: ", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, viewmodel.NewErrorResponse("unable to load profile"))
+		return
+	}
+	reg, ok := user.GetRegisteredDevice(req.DeviceID)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusNotFound, viewmodel.NewErrorResponse("device not registered for this account"))
+		return
+	}
+	desc := reg.DeviceDesc
+	if strings.TrimSpace(req.DeviceDesc) != "" {
+		desc = strings.TrimSpace(req.DeviceDesc)
+	}
+	token, err := app.issueDeviceToken(uid, req.DeviceID, desc)
+	if err != nil {
+		log.Error(uiLogger, "reissue device token: ", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, viewmodel.NewErrorResponse("could not issue token"))
+		return
+	}
+	user.UpsertRegisteredDevice(req.DeviceID, desc, req.DeviceLink)
+	if err := app.userStorer.UpdateUser(user); err != nil {
+		log.Warn(uiLogger, "reissue device persist: ", err)
+	}
+	c.JSON(http.StatusOK, viewmodel.ReissueDeviceResponse{Token: token})
+}
+
+func toVMRegisteredDevice(d model.RegisteredDevice) viewmodel.RegisteredDeviceEntry {
+	e := viewmodel.RegisteredDeviceEntry{
+		DeviceID:   d.DeviceID,
+		DeviceDesc: d.DeviceDesc,
+		DeviceLink: d.DeviceLink,
+		Make:       d.Make,
+		Model:      d.Model,
+		Year:       d.Year,
+	}
+	if !d.RegisteredAt.IsZero() {
+		e.RegisteredAt = d.RegisteredAt.UTC().Format(time.RFC3339)
+	}
+	if !d.LastSeen.IsZero() {
+		e.LastSeen = d.LastSeen.UTC().Format(time.RFC3339)
+	}
+	return e
 }
 
 func (app *ReactAppWrapper) getTemplate(c *gin.Context) {
