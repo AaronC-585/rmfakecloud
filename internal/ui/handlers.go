@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/integrations"
 	"github.com/ddvk/rmfakecloud/internal/model"
 	"github.com/ddvk/rmfakecloud/internal/storage"
+	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/methods"
 	"github.com/ddvk/rmfakecloud/internal/ui/templates"
@@ -949,6 +952,62 @@ func (app *ReactAppWrapper) getBuiltinMethod(c *gin.Context) {
 	c.Header("Content-Type", "image/svg+xml")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.String(http.StatusOK, svg)
+}
+
+func (app *ReactAppWrapper) getEpubPath(c *gin.Context) {
+	uid := userID(c)
+	docid := common.ParamS(docIDParam, c)
+	pathParam := c.Param("path")
+	pathParam = strings.TrimPrefix(path.Clean("/"+pathParam), "/")
+	if pathParam == "" || strings.Contains(pathParam, "..") {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	type epubBackend interface {
+		GetEpubManifest(uid, docid string) (*epub.Manifest, error)
+		GetEpubFile(uid, docid, filePath string) (io.ReadCloser, string, error)
+		GetEpubCoverThumb(uid, docid string) (io.ReadCloser, string, error)
+	}
+	backend := app.getBackend(c)
+	eb, ok := backend.(epubBackend)
+	if !ok {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	if pathParam == "cover-thumb" {
+		reader, contentType, err := eb.GetEpubCoverThumb(uid, docid)
+		if err != nil {
+			log.Debug("epub cover-thumb: ", err)
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		defer reader.Close()
+		c.Header("Content-Type", contentType)
+		c.Header("Cache-Control", "public, max-age=86400")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.DataFromReader(http.StatusOK, -1, contentType, reader, nil)
+		return
+	}
+	if pathParam == "manifest" {
+		manifest, err := eb.GetEpubManifest(uid, docid)
+		if err != nil {
+			log.Error(err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		c.JSON(http.StatusOK, manifest)
+		return
+	}
+	reader, contentType, err := eb.GetEpubFile(uid, docid, pathParam)
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	defer reader.Close()
+	c.Header("Content-Type", contentType)
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.DataFromReader(http.StatusOK, -1, contentType, reader, nil)
 }
 
 func (app *ReactAppWrapper) getRawBlob(c *gin.Context) {

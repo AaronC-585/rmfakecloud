@@ -89,6 +89,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("documents/:docid/template", app.getTemplate)
 	auth.GET("templates/:id", app.getBuiltinTemplate)
 	auth.GET("methods/:id", app.getBuiltinMethod)
+	auth.GET("documents/:docid/epub/*path", app.getEpubPath)
 	auth.GET("blobs/:blobid", app.getRawBlob)
 	auth.GET("documents/:docid/blobs", app.getBlobTree)
 	ss := auth.Group("screenshare")
