@@ -1196,6 +1196,36 @@ func (app *ReactAppWrapper) getDocumentPageBackground(c *gin.Context) {
 	c.DataFromReader(http.StatusOK, -1, "image/png", reader, nil)
 }
 
+func (app *ReactAppWrapper) getDocumentPageThumb(c *gin.Context) {
+	uid := userID(c)
+	docid := common.ParamS(docIDParam, c)
+	pagenumStr := c.Param("pagenum")
+	pagenum, err := strconv.Atoi(pagenumStr)
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	type pageThumbExporter interface {
+		ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	}
+	backend := app.getBackend(c)
+	pe, ok := backend.(pageThumbExporter)
+	if !ok {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	reader, err := pe.ExportPageThumbPNG(uid, docid, pagenum)
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+	c.Header("Content-Type", "image/png")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.DataFromReader(http.StatusOK, -1, "image/png", reader, nil)
+}
+
 func (app *ReactAppWrapper) getDocumentPageOverlay(c *gin.Context) {
 	uid := userID(c)
 	docid := common.ParamS(docIDParam, c)

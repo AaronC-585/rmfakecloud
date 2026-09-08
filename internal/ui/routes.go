@@ -98,6 +98,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("methods/:id", app.getBuiltinMethod)
 	auth.GET("documents/:docid/page/:pagenum", app.getDocumentPage)
 	auth.GET("documents/:docid/page/:pagenum/background", app.getDocumentPageBackground)
+	auth.GET("documents/:docid/page/:pagenum/thumb", app.getDocumentPageThumb)
 	auth.GET("documents/:docid/page/:pagenum/overlay.svg", app.getDocumentPageOverlay)
 	auth.GET("documents/:docid/epub/*path", app.getEpubPath)
 	auth.GET("blobs/:blobid", app.getRawBlob)
