@@ -41,6 +41,10 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 		c.SetCookie(cookieName, "/", -1, "", "", false, true)
 		c.Status(http.StatusOK)
 	})
+	r.POST("logout", func(c *gin.Context) {
+		c.SetCookie(cookieName, "/", -1, "", "", false, true)
+		c.Status(http.StatusOK)
+	})
 	//with authentication
 	auth := r.Group("")
 	auth.Use(app.authMiddleware())
@@ -86,6 +90,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("integrations/:intid/metadata/*path", app.getMetadataIntegration)
 	auth.GET("integrations/:intid/download/*path", app.downloadThroughIntegration)
 
+	auth.GET("newcode/status", app.newCodeStatus)
 	auth.GET("documents/:docid/template", app.getTemplate)
 	auth.GET("templates/:id", app.getBuiltinTemplate)
 	auth.GET("methods/:id", app.getBuiltinMethod)
