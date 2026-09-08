@@ -138,32 +138,12 @@ func (app *ReactAppWrapper) login(c *gin.Context) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-
-	scopes := ""
-	if user.Sync15 {
-		scopes = isSync15Key
-	}
-	expiresAfter := 24 * time.Hour
-	expires := time.Now().Add(expiresAfter)
-	claims := &WebUserClaims{
-		UserID:    user.ID,
-		BrowserID: uuid.NewString(),
-		Email:     user.Email,
-		Scopes:    scopes,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expires),
-			Issuer:    "rmFake WEB",
-			Audience:  []string{WebUsage},
-		},
-	}
-	if user.IsAdmin {
-		claims.Roles = []string{AdminRole}
-	} else {
-		claims.Roles = []string{"User"}
+	user.LastLoginAt = time.Now()
+	if err := app.userStorer.UpdateUser(user); err != nil {
+		log.Warn(uiLogger, "persist last login: ", err)
 	}
 
-	tokenString, err := common.SignClaims(claims, app.cfg.JWTSecretKey)
-
+	tokenString, expiresAfter, err := app.issueWebTokenForUser(user, uuid.NewString(), false, "")
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -425,11 +405,18 @@ func (app *ReactAppWrapper) getAppUsers(c *gin.Context) {
 	uilist := make([]viewmodel.User, 0)
 	for _, u := range users {
 		usr := viewmodel.User{
-			ID:        u.ID,
-			Email:     u.Email,
-			Name:      u.Name,
-			CreatedAt: u.CreatedAt,
-			IsAdmin:   u.IsAdmin,
+			ID:                u.ID,
+			Email:             u.Email,
+			Name:              u.Name,
+			CreatedAt:         u.CreatedAt,
+			PasswordChangedAt: u.PasswordChangedAt,
+			LastLoginAt:       u.LastLoginAt,
+			QuotaBytes:        ptrInt64(u.QuotaBytes),
+			IsAdmin:           u.IsAdmin,
+		}
+		usr.FileUsageBytes = app.userFileUsageBytes(u)
+		for _, d := range u.RegisteredDevices {
+			usr.RegisteredDevices = append(usr.RegisteredDevices, toVMRegisteredDevice(d))
 		}
 		uilist = append(uilist, usr)
 	}
@@ -459,10 +446,17 @@ func (app *ReactAppWrapper) getUser(c *gin.Context) {
 	}
 
 	vmUser := &viewmodel.User{
-		ID:        user.ID,
-		Email:     user.Email,
-		Name:      user.Name,
-		CreatedAt: user.CreatedAt,
+		ID:                user.ID,
+		Email:             user.Email,
+		Name:              user.Name,
+		CreatedAt:         user.CreatedAt,
+		PasswordChangedAt: user.PasswordChangedAt,
+		LastLoginAt:       user.LastLoginAt,
+		QuotaBytes:        ptrInt64(user.QuotaBytes),
+	}
+	vmUser.FileUsageBytes = app.userFileUsageBytes(user)
+	for _, d := range user.RegisteredDevices {
+		vmUser.RegisteredDevices = append(vmUser.RegisteredDevices, toVMRegisteredDevice(d))
 	}
 	for _, i := range user.Integrations {
 		vmUser.Integrations = append(vmUser.Integrations, i.Name)
@@ -495,6 +489,13 @@ func (app *ReactAppWrapper) updateUser(c *gin.Context) {
 
 	if req.Email != "" {
 		user.Email = req.Email
+	}
+	if req.QuotaBytes != nil {
+		if *req.QuotaBytes < 0 {
+			badReq(c, "quotaBytes must be >= 0")
+			return
+		}
+		user.QuotaBytes = *req.QuotaBytes
 	}
 
 	err = app.userStorer.UpdateUser(user)
@@ -557,7 +558,7 @@ func (app *ReactAppWrapper) listIntegrations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user.Integrations)
+	c.JSON(http.StatusOK, app.effectiveIntegrationsForUser(user))
 }
 
 func warnLocalfsEdition(c *gin.Context, int *model.IntegrationConfig) {
@@ -578,6 +579,10 @@ func (app *ReactAppWrapper) createIntegration(c *gin.Context) {
 		badReq(c, err.Error())
 		return
 	}
+	if int.Shared && !IsAdmin(c) {
+		c.AbortWithStatusJSON(http.StatusForbidden, viewmodel.NewErrorResponse("only admins can create shared integrations"))
+		return
+	}
 
 	if int.Provider == integrations.LocalfsProvider {
 		int.ID = uuid.NewString()
@@ -595,7 +600,11 @@ func (app *ReactAppWrapper) createIntegration(c *gin.Context) {
 	}
 
 	int.ID = uuid.NewString()
-	user.Integrations = append(user.Integrations, int)
+	if int.Shared {
+		user.SharedIntegrations = append(user.SharedIntegrations, int)
+	} else {
+		user.Integrations = append(user.Integrations, int)
+	}
 
 	err = app.userStorer.UpdateUser(user)
 
@@ -620,7 +629,7 @@ func (app *ReactAppWrapper) getIntegration(c *gin.Context) {
 		return
 	}
 
-	for _, integration := range user.Integrations {
+	for _, integration := range app.effectiveIntegrationsForUser(user) {
 		if integration.ID == intid {
 			c.JSON(http.StatusOK, integration)
 			return
@@ -657,6 +666,7 @@ func (app *ReactAppWrapper) updateIntegration(c *gin.Context) {
 	for idx, integration := range user.Integrations {
 		if integration.ID == intid {
 			int.ID = integration.ID
+			int.Shared = false
 			user.Integrations[idx] = int
 
 			err = app.userStorer.UpdateUser(user)
@@ -669,6 +679,23 @@ func (app *ReactAppWrapper) updateIntegration(c *gin.Context) {
 
 			c.JSON(http.StatusOK, int)
 			return
+		}
+	}
+	if IsAdmin(c) {
+		for idx, integration := range user.SharedIntegrations {
+			if integration.ID == intid {
+				int.ID = integration.ID
+				int.Shared = true
+				user.SharedIntegrations[idx] = int
+				err = app.userStorer.UpdateUser(user)
+				if err != nil {
+					log.Error("error updating user", err)
+					c.AbortWithStatus(http.StatusInternalServerError)
+					return
+				}
+				c.JSON(http.StatusOK, int)
+				return
+			}
 		}
 	}
 
@@ -701,6 +728,21 @@ func (app *ReactAppWrapper) deleteIntegration(c *gin.Context) {
 
 			c.Status(http.StatusAccepted)
 			return
+		}
+	}
+	if IsAdmin(c) {
+		for idx, integration := range user.SharedIntegrations {
+			if integration.ID == intid {
+				user.SharedIntegrations = append(user.SharedIntegrations[:idx], user.SharedIntegrations[idx+1:]...)
+				err = app.userStorer.UpdateUser(user)
+				if err != nil {
+					log.Error("error updating user", err)
+					c.AbortWithStatus(http.StatusInternalServerError)
+					return
+				}
+				c.Status(http.StatusAccepted)
+				return
+			}
 		}
 	}
 
@@ -902,6 +944,46 @@ func (app *ReactAppWrapper) screenshareDeleteRoom(c *gin.Context) {
 	uid := userID(c)
 	app.roomManager.DeleteAllForUser(uid)
 	c.Status(http.StatusNoContent)
+}
+
+func suBy(c *gin.Context) string {
+	return c.GetString(suByContextKey)
+}
+
+func (app *ReactAppWrapper) issueWebTokenForUser(user *model.User, browserID string, keepAdmin bool, suByUserID string) (string, time.Duration, error) {
+	if user == nil {
+		return "", 0, fmt.Errorf("user is nil")
+	}
+	scopes := ""
+	if user.Sync15 {
+		scopes = isSync15Key
+	}
+	expiresAfter := 24 * time.Hour
+	expires := time.Now().Add(expiresAfter)
+	claims := &WebUserClaims{
+		UserID:    user.ID,
+		BrowserID: browserID,
+		SuBy:      suByUserID,
+		AllowSu:   app.cfg.AllowSu,
+		Email:     user.Email,
+		Scopes:    scopes,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expires),
+			Issuer:    "rmFake WEB",
+			Audience:  []string{WebUsage},
+		},
+	}
+	if user.IsAdmin || keepAdmin {
+		// Keep Admin first to satisfy the current frontend role guard.
+		claims.Roles = []string{AdminRole, "User"}
+	} else {
+		claims.Roles = []string{"User"}
+	}
+	tokenString, err := common.SignClaims(claims, app.cfg.JWTSecretKey)
+	if err != nil {
+		return "", 0, err
+	}
+	return tokenString, expiresAfter, nil
 }
 
 func (app *ReactAppWrapper) newCodeStatus(c *gin.Context) {
@@ -1121,4 +1203,142 @@ func (app *ReactAppWrapper) getBlobTree(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, files)
+}
+
+func (app *ReactAppWrapper) userFileUsageBytes(user *model.User) int64 {
+	if user == nil {
+		return 0
+	}
+	backend, ok := app.backends[userSyncVersion(user)]
+	if !ok || backend == nil {
+		return 0
+	}
+	tree, err := backend.GetDocumentTree(user.ID)
+	if err != nil || tree == nil {
+		if err != nil {
+			log.Warn(uiLogger, "file usage: ", user.ID, ": ", err)
+		}
+		return 0
+	}
+	total := int64(0)
+	total += sumEntrySizes(tree.Entries)
+	total += sumEntrySizes(tree.Trash)
+	return total
+}
+
+func userSyncVersion(user *model.User) common.SyncVersion {
+	if user != nil && user.Sync15 {
+		return common.Sync15
+	}
+	return common.Sync10
+}
+
+func sumEntrySizes(entries []viewmodel.Entry) int64 {
+	total := int64(0)
+	for _, entry := range entries {
+		switch x := entry.(type) {
+		case *viewmodel.Document:
+			total += x.Size
+		case *viewmodel.Directory:
+			total += sumEntrySizes(x.Entries)
+		}
+	}
+	return total
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
+}
+
+func (app *ReactAppWrapper) suUser(c *gin.Context) {
+	if app.cfg == nil || !app.cfg.AllowSu {
+		c.AbortWithStatusJSON(http.StatusForbidden, viewmodel.NewErrorResponse("su is disabled (set RMFAKECLOUD_ALLOW_SU=true)"))
+		return
+	}
+	var req viewmodel.SuRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badReq(c, err.Error())
+		return
+	}
+	target, err := app.userStorer.GetUser(req.UserID)
+	if err != nil || target == nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, viewmodel.NewErrorResponse("target user not found"))
+		return
+	}
+
+	// su switches document context to target user while preserving admin powers
+	// so admins can continue switching across users to inspect files.
+	target.LastLoginAt = time.Now()
+	if err := app.userStorer.UpdateUser(target); err != nil {
+		log.Warn(uiLogger, "persist su last login: ", err)
+	}
+	rootAdmin := userID(c)
+	if prior := suBy(c); prior != "" {
+		rootAdmin = prior
+	}
+	suByUserID := ""
+	if target.ID != rootAdmin {
+		suByUserID = rootAdmin
+	}
+	tokenString, expiresAfter, err := app.issueWebTokenForUser(target, uuid.NewString(), true, suByUserID)
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(cookieName, tokenString, int(expiresAfter.Seconds()), "/", "", app.cfg.HTTPSCookie, true)
+	c.String(http.StatusOK, tokenString)
+}
+
+func (app *ReactAppWrapper) leaveSu(c *gin.Context) {
+	rootAdmin := suBy(c)
+	if rootAdmin == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, viewmodel.NewErrorResponse("not in su session"))
+		return
+	}
+	adminUser, err := app.userStorer.GetUser(rootAdmin)
+	if err != nil || adminUser == nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, viewmodel.NewErrorResponse("original admin not found"))
+		return
+	}
+	tokenString, expiresAfter, err := app.issueWebTokenForUser(adminUser, uuid.NewString(), false, "")
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(cookieName, tokenString, int(expiresAfter.Seconds()), "/", "", app.cfg.HTTPSCookie, true)
+	c.String(http.StatusOK, tokenString)
+}
+
+func (app *ReactAppWrapper) effectiveIntegrationsForUser(user *model.User) []model.IntegrationConfig {
+	if user == nil {
+		return nil
+	}
+	out := make([]model.IntegrationConfig, 0, len(user.Integrations)+len(user.SharedIntegrations))
+	for _, cfg := range user.Integrations {
+		cfg.Shared = false
+		out = append(out, cfg)
+	}
+	users, err := app.userStorer.GetUsers()
+	if err != nil {
+		return out
+	}
+	for _, u := range users {
+		if u == nil || !u.IsAdmin {
+			continue
+		}
+		for _, cfg := range u.SharedIntegrations {
+			cfg.Shared = true
+			if user.IsAdmin && u.ID == user.ID {
+				cfg.ReadOnly = cfg.ReadOnly
+			} else {
+				cfg.ReadOnly = true
+			}
+			out = append(out, cfg)
+		}
+	}
+	return out
 }

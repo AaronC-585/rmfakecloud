@@ -99,6 +99,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("documents/:docid/epub/*path", app.getEpubPath)
 	auth.GET("blobs/:blobid", app.getRawBlob)
 	auth.GET("documents/:docid/blobs", app.getBlobTree)
+	auth.POST("su/leave", app.leaveSu)
 	ss := auth.Group("screenshare")
 	ss.GET("room", app.screenshareJoinActive)
 	ss.GET("room/:roomId", app.screenshareGetRoom)
@@ -109,6 +110,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	//admin
 	admin := auth.Group("")
 	admin.Use(app.adminMiddleware())
+	admin.POST("su", app.suUser)
 	admin.GET("users/:userid", app.getUser)
 	admin.DELETE("users/:userid", app.deleteUser)
 	admin.PUT("users", app.updateUser)
