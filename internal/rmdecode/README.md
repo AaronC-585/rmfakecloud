@@ -109,6 +109,18 @@ Configuration options for v3 stroke rendering (lines-are-beautiful):
 - **`RMFAKECLOUD_LINES2SVG_BIN`** — full path to `lines2svg` (optional; otherwise PATH lookup).
 - **`RMFAKECLOUD_LINES2PNG_BIN`** — full path to `lines2png` (optional; otherwise PATH lookup).
 
+### PDF page backgrounds (device-like OOP raster)
+
+Web UI backgrounds / composites use an out-of-process PDF engine first (same idea as
+`xochitl_pdf_renderer` + PDFium on the tablet):
+
+- **`RMFAKECLOUD_PDF_RENDERER`** — `auto` (default), `pdftoppm`, `mutool`, or `unipdf`.
+  - `auto`: try `pdftoppm` → `mutool` → unipdf
+  - Target width: **1404** px (device portrait)
+
+Server composites (`GET /documents/:id/page/:n`) multiply-blend PDF background × ink PNG.
+Device-sized thumbs: `GET /documents/:id/page/:n/thumb` (~384×512).
+
 
 ## References
 

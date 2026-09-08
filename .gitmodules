@@ -4,3 +4,6 @@
 [submodule "ui/extra/simplerenderer/librm_lines"]
 	path = ui/extra/simplerenderer/librm_lines
 	url = https://github.com/RedTTGMoss/librm_lines
+[submodule "third_party/rmc"]
+	path = third_party/rmc
+	url = https://github.com/ricklupton/rmc.git

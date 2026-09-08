@@ -23,16 +23,16 @@ const layerImg = {
 };
 
 /**
- * Grid thumbnail: optional background PNG (template / PDF page) with strokes PNG on top.
- * Strokes from the API are white-backed; multiply blends white away so lines sit on the background.
+ * Grid thumbnail. Prefers the server composite thumb (device-like 384×512).
+ * Optional layered mode keeps bg+ink multiply for debugging / fallback.
  */
 export default function DocumentPageThumb({
   docId,
   pageNum = 1,
   alt = "",
-  /** When false, only the full-page PNG is shown (no background layer). */
-  layered = true,
-  /** Shown if the foreground PNG fails to load. */
+  /** When true, use client-side bg+ink layers instead of server thumb. */
+  layered = false,
+  /** Shown if the thumbnail PNG fails to load. */
   fallback = null,
 }) {
   const [bgState, setBgState] = useState(layered ? "pending" : "fail");
@@ -42,27 +42,40 @@ export default function DocumentPageThumb({
     return fallback ? <span style={{ display: "inline-flex" }}>{fallback}</span> : null;
   }
 
-  const showBg = layered && bgState === "ok";
+  if (!layered) {
+    return (
+      <div style={frameStyle} className="document-page-thumb" aria-label={alt || undefined}>
+        <img
+          src={apiservice.getDocumentPageThumbUrl(docId, pageNum)}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFgFailed(true)}
+          style={{ ...layerImg, position: "relative", zIndex: 1 }}
+        />
+      </div>
+    );
+  }
+
+  const showBg = bgState === "ok";
   const blendMode = showBg ? "multiply" : "normal";
 
   return (
     <div style={frameStyle} className="document-page-thumb" aria-label={alt || undefined}>
-      {layered && (
-        <img
-          src={apiservice.getDocumentPageBackgroundUrl(docId, pageNum)}
-          alt=""
-          aria-hidden
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setBgState("ok")}
-          onError={() => setBgState("fail")}
-          style={{
-            ...layerImg,
-            display: showBg ? "block" : "none",
-            zIndex: 0,
-          }}
-        />
-      )}
+      <img
+        src={apiservice.getDocumentPageBackgroundUrl(docId, pageNum)}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setBgState("ok")}
+        onError={() => setBgState("fail")}
+        style={{
+          ...layerImg,
+          display: showBg ? "block" : "none",
+          zIndex: 0,
+        }}
+      />
       <img
         src={apiservice.getDocumentPagePngUrl(docId, pageNum)}
         alt={alt}

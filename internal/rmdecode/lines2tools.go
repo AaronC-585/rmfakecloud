@@ -76,3 +76,21 @@ func RenderV3SVGWithLines2SVG(data []byte) (string, error) {
 func RenderV3PNGWithLines2PNG(data []byte) ([]byte, error) {
 	return renderV3WithLinesTool(data, EnvLines2PNGBin, "lines2png", "test.png")
 }
+
+// Lines2SVGAvailable reports whether lines2svg is configured or on PATH.
+func Lines2SVGAvailable() bool {
+	if strings.TrimSpace(os.Getenv(EnvLines2SVGBin)) != "" {
+		return true
+	}
+	_, err := exec.LookPath("lines2svg")
+	return err == nil
+}
+
+// Lines2PNGAvailable reports whether lines2png is configured or on PATH.
+func Lines2PNGAvailable() bool {
+	if strings.TrimSpace(os.Getenv(EnvLines2PNGBin)) != "" {
+		return true
+	}
+	_, err := exec.LookPath("lines2png")
+	return err == nil
+}

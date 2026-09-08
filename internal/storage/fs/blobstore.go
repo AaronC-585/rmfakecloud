@@ -328,7 +328,7 @@ func (fs *FileSystemStorage) GetDocumentOrientation(uid, docid string) (string, 
 }
 
 // ExportPagePNG exports a single page of the document as PNG (1-based page number).
-// - PDF documents: full composite (payload + strokes) via exporter PDF→PNG (cached as page-*-full-pdf-*).
+// - PDF documents: payload background (OOP PDF raster) × ink (.rm) multiply composite when writings exist.
 // - Notebooks / non-PDF: strokes rendered with rmdecode → raw PNG bytes (cached as page-*-rmdecode-*).
 // On cache hit, returns the stored PNG file unchanged.
 func (fs *FileSystemStorage) ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
@@ -352,17 +352,13 @@ func (fs *FileSystemStorage) ExportPagePNG(uid, docid string, pageNum int) (io.R
 	var gen func() ([]byte, error)
 
 	if payload == "pdf" {
-		cachePath = path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-full-pdf-%s.png", pageNum, docHash))
+		cachePath = path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-composite-v2-%s.png", pageNum, docHash))
 		gen = func() ([]byte, error) {
-			archive, e := models.ArchiveFromHashDoc(doc, ls)
-			if e != nil {
-				return nil, e
-			}
-			return exporter.RenderPagePNG(archive, pageNum)
+			return exportPDFPageCompositePNG(doc, ls, docid, pageNum)
 		}
 	} else {
 		// Notebook, template, or no payload: render .rm with rmdecode (raw PNG).
-		cachePath = path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-rmdecode-%s.png", pageNum, docHash))
+		cachePath = path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-rmdecode-v2-%s.png", pageNum, docHash))
 		gen = func() ([]byte, error) {
 			return exportNotebookPagePNGWithRmdecode(doc, ls, docid, pageNum)
 		}
@@ -377,7 +373,7 @@ func (fs *FileSystemStorage) ExportPagePNG(uid, docid string, pageNum int) (io.R
 	b, err := gen()
 	if err != nil {
 		// Fallback: legacy full-document PDF raster (slow, may include backgrounds).
-		log.Warn("ExportPagePNG rmdecode/pdf path failed, falling back to RenderPagePNG: ", err)
+		log.Warn("ExportPagePNG primary path failed, falling back to RenderPagePNG: ", err)
 		archive, e2 := models.ArchiveFromHashDoc(doc, ls)
 		if e2 != nil {
 			return nil, e2
@@ -406,6 +402,73 @@ func (fs *FileSystemStorage) ExportPagePNG(uid, docid string, pageNum int) (io.R
 	return exporter.NewSeekCloser(b), nil
 }
 
+// exportPDFPageCompositePNG builds a device-like page: PDF background × ink multiply.
+func exportPDFPageCompositePNG(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pageNum int) ([]byte, error) {
+	archive, err := models.ArchiveFromHashDoc(doc, ls)
+	if err != nil {
+		return nil, err
+	}
+	bg, err := exporter.RenderPayloadPagePNG(archive, pageNum)
+	if err != nil {
+		return nil, err
+	}
+	ink, inkErr := exportNotebookPagePNGWithRmdecode(doc, ls, docid, pageNum)
+	if inkErr != nil || len(ink) == 0 {
+		// No writings (or blank page): background only.
+		return bg, nil
+	}
+	// Blank notebook PNG is all white — multiply leaves bg unchanged, but skip the work
+	// when the .rm blob was missing (exportNotebook returns blank). Detect nearly-empty
+	// by checking whether a .rm existed via a second read is heavy; just blend.
+	comp, err := exporter.MultiplyBlendPNGs(bg, ink, nil)
+	if err != nil {
+		log.Warn("composite blend failed, returning background: ", err)
+		return bg, nil
+	}
+	return comp, nil
+}
+
+// ExportPageThumbPNG returns a device-sized (~384×512) composite thumbnail for a page.
+func (fs *FileSystemStorage) ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
+	tree, err := fs.GetCachedTree(uid)
+	if err != nil {
+		return nil, err
+	}
+	doc, err := tree.FindDoc(docid)
+	if err != nil {
+		return nil, err
+	}
+	docHash := doc.Hash
+	cacheDir := fs.getPathFromUser(uid, CacheDir)
+	_ = os.MkdirAll(cacheDir, 0700)
+	safeDoc := common.Sanitize(docid)
+	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-thumb-v2-%s.png", pageNum, docHash))
+	if docHash != "" {
+		if r, err := os.Open(cachePath); err == nil {
+			return r, nil
+		}
+	}
+
+	full, err := fs.ExportPagePNG(uid, docid, pageNum)
+	if err != nil {
+		return nil, err
+	}
+	defer full.Close()
+	raw, err := io.ReadAll(full)
+	if err != nil {
+		return nil, err
+	}
+	thumb, err := exporter.ScalePNGToThumb(raw)
+	if err != nil {
+		return nil, err
+	}
+	if docHash != "" {
+		_ = os.MkdirAll(path.Dir(cachePath), 0700)
+		_ = os.WriteFile(cachePath, thumb, 0600)
+	}
+	return exporter.NewSeekCloser(thumb), nil
+}
+
 // ExportPageBackgroundPNG renders the original payload (PDF) page as PNG (without handwriting).
 func (fs *FileSystemStorage) ExportPageBackgroundPNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
 	tree, err := fs.GetCachedTree(uid)
@@ -427,7 +490,7 @@ func (fs *FileSystemStorage) ExportPageBackgroundPNG(uid, docid string, pageNum 
 	cacheDir := fs.getPathFromUser(uid, CacheDir)
 	_ = os.MkdirAll(cacheDir, 0700)
 	safeDoc := common.Sanitize(docid)
-	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-bg-%s.png", pageNum, pdfHash))
+	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-bg-oop-%s.png", pageNum, pdfHash))
 	if pdfHash != "" {
 		if r, err := os.Open(cachePath); err == nil {
 			return r, nil
@@ -504,48 +567,32 @@ func (fs *FileSystemStorage) ExportPageOverlaySVG(uid, docid string, pageNum int
 	cacheDir := fs.getPathFromUser(uid, CacheDir)
 	_ = os.MkdirAll(cacheDir, 0700)
 	safeDoc := common.Sanitize(docid)
-	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-ov-%s.svg", pageNum, rmHash))
+	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-ov-v3-%s.svg", pageNum, rmHash))
 	if rmHash != "" {
 		if r, err := os.Open(cachePath); err == nil {
 			return r, nil
 		}
 	}
 
-	// For v3 pages, use the embedded lines-are-beautiful-inspired renderer.
-	// For v6 pages, prefer rmc's SVG renderer when available.
-	// Both paths fall back to the legacy stroke-only renderer on failure.
+	// Transparent SVG overlay is the app’s ink layer for PDF/EPUB/notebooks.
+	// Prefer rmc (via RMFAKECLOUD_RMC_SRC) for v6; lines2svg/embedded for v3.
 	if rmHash != "" {
 		if rc, err := ls.GetReader(rmHash); err == nil {
 			rmData, readErr := io.ReadAll(rc)
 			_ = rc.Close()
 			if readErr == nil {
-				if ver, vErr := rmdecode.ParseVersion(rmData); vErr == nil && ver == 3 {
-					if s, rErr := rmdecode.RenderV3SVGWithLines2SVG(rmData); rErr == nil {
-						b := []byte(s)
-						_ = os.MkdirAll(path.Dir(cachePath), 0700)
-						_ = os.WriteFile(cachePath, b, 0600)
-						return exporter.NewSeekCloser(b), nil
+				if s, rErr := rmdecode.RenderRmOverlaySVG(rmData); rErr == nil {
+					b := []byte(s)
+					_ = os.MkdirAll(path.Dir(cachePath), 0700)
+					_ = os.WriteFile(cachePath, b, 0600)
+					return exporter.NewSeekCloser(b), nil
+				} else {
+					log.Warn("overlay SVG render failed; falling back: ", rErr)
+					if ver, vErr := rmdecode.ParseVersion(rmData); vErr == nil && ver == 6 && rmdecode.RMCAvailable() {
+						return nil, fmt.Errorf("v6 overlay: rmc required but failed: %w", rErr)
 					}
-					if p, dErr := rmdecode.DecodeLegacy(rmData); dErr == nil {
-						if s, rErr := rmdecode.RenderV3SVGOverlayEmbedded(p); rErr == nil {
-							b := []byte(s)
-							_ = os.MkdirAll(path.Dir(cachePath), 0700)
-							_ = os.WriteFile(cachePath, b, 0600)
-							return exporter.NewSeekCloser(b), nil
-						} else {
-							log.Warn("v3 overlay render failed; falling back: ", rErr)
-						}
-					} else {
-						log.Warn("v3 overlay decode failed; falling back: ", dErr)
-					}
-				} else if vErr == nil && ver == 6 {
-					if s, rErr := rmdecode.RenderV6SVGWithRMC(rmData); rErr == nil {
-						b := []byte(s)
-						_ = os.MkdirAll(path.Dir(cachePath), 0700)
-						_ = os.WriteFile(cachePath, b, 0600)
-						return exporter.NewSeekCloser(b), nil
-					} else {
-						log.Warn("v6 overlay via rmc failed; falling back: ", rErr)
+					if ver, vErr := rmdecode.ParseVersion(rmData); vErr == nil && ver == 3 && rmdecode.Lines2SVGAvailable() {
+						return nil, fmt.Errorf("v3 overlay: lines2svg available but failed: %w", rErr)
 					}
 				}
 			}
@@ -560,7 +607,7 @@ func (fs *FileSystemStorage) ExportPageOverlaySVG(uid, docid string, pageNum int
 	if err != nil {
 		return nil, err
 	}
-	b := []byte(s)
+	b := []byte(rmdecode.EnsureTransparentOverlaySVG(s))
 	if rmHash != "" {
 		_ = os.MkdirAll(path.Dir(cachePath), 0700)
 		_ = os.WriteFile(cachePath, b, 0600)

@@ -84,6 +84,10 @@ const (
 	envHashSchemaVersion = "HASH_SCHEMA_VERSION"
 	// envRmrlPython if set, path to a Python interpreter with the `rmrl` package installed; used for optional higher-fidelity notebook→PDF export (see rmrl).
 	envRmrlPython = "RMFAKECLOUD_RMRL_PYTHON"
+	// envAllowSu enables admin "su" (impersonate another user) in the web UI. Not editable via the web UI.
+	envAllowSu = "RMFAKECLOUD_ALLOW_SU"
+	// EnvRMCSrc is also defined in rmdecode; keep the name identical for docs/env help.
+	EnvRMCSrc = "RMFAKECLOUD_RMC_SRC"
 )
 
 // Config config
@@ -111,6 +115,11 @@ type Config struct {
 	HashSchemaVersion string
 	// RmrlPython optional interpreter (e.g. /usr/bin/python3) to run `python -m rmrl` for PDF export of notebooks when compatible.
 	RmrlPython string
+	// AllowSu enables admin impersonation (POST /ui/api/su). Env-only; not configurable from the web UI.
+	AllowSu bool
+	// RmcSrc is the rmc package "src" directory for v6 .rm conversion (RMFAKECLOUD_RMC_SRC).
+	// Editable by admins in the web UI; persisted under DATADIR/server_settings.json.
+	RmcSrc string
 }
 
 // Verify verify
@@ -150,6 +159,14 @@ func (cfg *Config) Verify() {
 
 	if strings.TrimSpace(cfg.RmrlPython) != "" {
 		log.Infof("rmrl PDF export enabled (%s=%q); install templates under XDG data rmrl/templates if needed", envRmrlPython, cfg.RmrlPython)
+	}
+	if cfg.AllowSu {
+		log.Infof("admin su (impersonation) enabled (%s=true)", envAllowSu)
+	} else {
+		log.Infof("admin su (impersonation) disabled (set %s=true to enable)", envAllowSu)
+	}
+	if strings.TrimSpace(cfg.RmcSrc) != "" {
+		log.Infof("rmc source configured (%s=%q)", EnvRMCSrc, cfg.RmcSrc)
 	}
 }
 
@@ -273,6 +290,8 @@ func FromEnv() *Config {
 		log.Fatalf("%s must be either '3' or '4', got: %s", envHashSchemaVersion, hashSchemaVersion)
 	}
 
+	allowSu, _ := strconv.ParseBool(os.Getenv(envAllowSu))
+
 	cfg := Config{
 		Port:              port,
 		StorageURL:        uploadURL,
@@ -293,7 +312,11 @@ func FromEnv() *Config {
 		ICEServers:        iceServers,
 		HashSchemaVersion: hashSchemaVersion,
 		RmrlPython:        strings.TrimSpace(os.Getenv(envRmrlPython)),
+		AllowSu:           allowSu,
+		RmcSrc:            strings.TrimSpace(os.Getenv(EnvRMCSrc)),
 	}
+	cfg.LoadServerSettings()
+	cfg.ApplyRuntimeEnv()
 	return &cfg
 }
 
@@ -318,6 +341,8 @@ General:
 	%s Send auth cookie only via https
 	%s	Trust the proxy for X-Forwarded-For/X-Real-IP (set only if behind a proxy)
 	%s	Hash tree schema version: "3" or "4" (default: 3)
+	%s	Enable admin "su" (impersonate another user) in the web UI (default: false). Env-only; not editable from the UI.
+	%s	Path to rmc source "src" dir for v6 .rm→SVG/PDF (also editable by admins in the web UI).
 
 Optional notebook PDF (rmrl, reMarkable-like rendering):
 	%s	Path to Python 3 with pip package "rmrl" installed. When set, notebook PDF download uses rmrl when possible (v3/v5 .rm), with fallback to the built-in renderer. Install line templates in XDG data dir (e.g. ~/.local/share/rmrl/templates).
@@ -358,6 +383,8 @@ myScript hwr (needs a developer account):
 		envHTTPSCookie,
 		envTrustProxy,
 		envHashSchemaVersion,
+		envAllowSu,
+		EnvRMCSrc,
 
 		envRmrlPython,
 

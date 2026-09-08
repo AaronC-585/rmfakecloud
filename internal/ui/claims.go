@@ -7,6 +7,7 @@ type WebUserClaims struct {
 	UserID    string `json:"UserID"`
 	BrowserID string `json:"BrowserID"`
 	SuBy      string `json:"SuBy,omitempty"`
+	AllowSu   bool   `json:"AllowSu,omitempty"`
 	Email     string
 	Scopes    string `json:"scopes,omitempty"`
 	Roles     []string

@@ -131,6 +131,13 @@ func (d *backend10) ExportPageBackgroundPNG(uid, docid string, pageNum int) (io.
 	return d.blobHandler.ExportPageBackgroundPNG(uid, docid, pageNum)
 }
 
+func (d *backend10) ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
+	if d.blobHandler == nil {
+		return nil, errors.New("blob handler not configured")
+	}
+	return d.blobHandler.ExportPageThumbPNG(uid, docid, pageNum)
+}
+
 func (d *backend10) ExportPageOverlaySVG(uid, docid string, pageNum int) (io.ReadCloser, error) {
 	if d.blobHandler == nil {
 		return nil, errors.New("blob handler not configured")

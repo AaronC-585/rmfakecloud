@@ -8,6 +8,7 @@ import UserProfileModal from "./UserProfileModal";
 import NewUserModal from "./NewUserModal";
 import apiService from "../../services/api.service";
 import { formatDate } from "../../common/date";
+import { useAuthState } from "../../common/useAuthContext";
 
 const userListUrl = "users";
 
@@ -34,6 +35,8 @@ export default function UserList() {
   const { data: userList, error, loading } = useFetch(`${userListUrl}`, index);
   const [suBusyUser, setSuBusyUser] = useState("");
   const [ state, setState ] = useState({showModal: 0, modalUser: null});
+  const { state: { user } } = useAuthState();
+  const allowSu = !!user?.AllowSu;
   const refresh = () =>{
     setIndex(previous => previous+1)
   }
@@ -180,15 +183,17 @@ export default function UserList() {
               <td>{x.PasswordChangedAt ? formatDate(x.PasswordChangedAt) : "—"}</td>
               <td>{formatDate(x.CreatedAt)}</td>
               <td>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="me-2"
-                  disabled={suBusyUser !== ""}
-                  onClick={(e) => suAs(e, x.userid)}
-                >
-                  {suBusyUser === x.userid ? "Switching..." : "su"}
-                </Button>
+                {allowSu && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="me-2"
+                    disabled={suBusyUser !== ""}
+                    onClick={(e) => suAs(e, x.userid)}
+                  >
+                    {suBusyUser === x.userid ? "Switching..." : "su"}
+                  </Button>
+                )}
                 <Button size="sm" variant="danger" onClick={(e) => remove(e,x.userid)}>
                   Delete
                 </Button>

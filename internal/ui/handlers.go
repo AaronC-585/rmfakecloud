@@ -173,6 +173,7 @@ func (app *ReactAppWrapper) issueWebTokenForUser(user *model.User, browserID str
 		UserID:    user.ID,
 		BrowserID: browserID,
 		SuBy:      suByUserID,
+		AllowSu:   app.cfg.AllowSu,
 		Email:     user.Email,
 		Scopes:    scopes,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -525,6 +526,36 @@ func (app *ReactAppWrapper) getDocumentPageBackground(c *gin.Context) {
 		return
 	}
 	reader, err := pe.ExportPageBackgroundPNG(uid, docid, pagenum)
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+	c.Header("Content-Type", "image/png")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.DataFromReader(http.StatusOK, -1, "image/png", reader, nil)
+}
+
+func (app *ReactAppWrapper) getDocumentPageThumb(c *gin.Context) {
+	uid := userID(c)
+	docid := common.ParamS(docIDParam, c)
+	pagenumStr := c.Param("pagenum")
+	pagenum, err := strconv.Atoi(pagenumStr)
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	type pageThumbExporter interface {
+		ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	}
+	backend := app.getBackend(c)
+	pe, ok := backend.(pageThumbExporter)
+	if !ok {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	reader, err := pe.ExportPageThumbPNG(uid, docid, pagenum)
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -907,6 +938,10 @@ func ptrInt64(v int64) *int64 {
 }
 
 func (app *ReactAppWrapper) suUser(c *gin.Context) {
+	if app.cfg == nil || !app.cfg.AllowSu {
+		c.AbortWithStatusJSON(http.StatusForbidden, viewmodel.NewErrorResponse("su is disabled (set RMFAKECLOUD_ALLOW_SU=true)"))
+		return
+	}
 	var req viewmodel.SuRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badReq(c, err.Error())

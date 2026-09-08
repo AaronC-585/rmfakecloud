@@ -10,18 +10,16 @@ import (
 )
 
 const (
-	// EnvRMCBin points to an rmc executable (optional). If unset, PATH is used.
+	// EnvRMCBin points to an rmc executable (optional). If unset, PATH then vendored module is used.
 	EnvRMCBin = "RMFAKECLOUD_RMC_BIN"
-	// EnvRMCSrc points to the "src" directory of the rmc repo checkout (optional).
-	// Example: /home/user/Downloads/rmc-main/src
+	// EnvRMCSrc optionally overrides the vendored third_party/rmc/src directory.
 	EnvRMCSrc = "RMFAKECLOUD_RMC_SRC"
-	// EnvRMSSceneSrc optionally points to rmscene's Python source directory.
-	// Example: /path/to/rmscene/src
+	// EnvRMSSceneSrc optionally overrides vendored third_party/rmscene/src.
 	EnvRMSSceneSrc = "RMFAKECLOUD_RMSCENE_SRC"
 )
 
 // RenderV6SVGWithRMC renders a v6 .rm page to SVG by invoking rmc.
-// It prefers an rmc binary, and falls back to "python3 -m rmc.cli" if EnvRMCSrc is set.
+// Order: rmc binary (PATH/env) → python3 -m rmc.cli with vendored (or overridden) sources.
 func RenderV6SVGWithRMC(data []byte) (string, error) {
 	ver, err := ParseVersion(data)
 	if err != nil {
@@ -64,7 +62,7 @@ func runRMCBinary(inPath, outPath string) error {
 		var err error
 		rmcBin, err = exec.LookPath("rmc")
 		if err != nil {
-			return fmt.Errorf("rmc binary not found (set %s or install rmc): %w", EnvRMCBin, err)
+			return fmt.Errorf("rmc binary not found: %w", err)
 		}
 	}
 	cmd := exec.Command(rmcBin, "-t", "svg", "-o", outPath, inPath)
@@ -81,9 +79,9 @@ func runRMCBinary(inPath, outPath string) error {
 }
 
 func runRMCModule(inPath, outPath string) error {
-	rmcSrc := strings.TrimSpace(os.Getenv(EnvRMCSrc))
+	rmcSrc := EffectiveRMCSrc()
 	if rmcSrc == "" {
-		return fmt.Errorf("module mode disabled (set %s)", EnvRMCSrc)
+		return fmt.Errorf("no rmc source (vendored third_party/rmc missing; set %s)", EnvRMCSrc)
 	}
 	python, err := exec.LookPath("python3")
 	if err != nil {
@@ -111,4 +109,15 @@ func readSVG(outPath string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// RMCAvailable reports whether rmc can be invoked (binary, override, or vendored source).
+func RMCAvailable() bool {
+	if strings.TrimSpace(os.Getenv(EnvRMCBin)) != "" {
+		return true
+	}
+	if _, err := exec.LookPath("rmc"); err == nil {
+		return true
+	}
+	return EffectiveRMCSrc() != ""
 }

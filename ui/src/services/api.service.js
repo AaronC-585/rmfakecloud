@@ -299,6 +299,35 @@ class ApiServices {
     });
   }
 
+  getServerSettings() {
+    return fetch(`${constants.ROOT_URL}/server-settings`, {
+      method: "GET",
+      credentials: "same-origin",
+    }).then((r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+
+  updateServerSettings(settings) {
+    return fetch(`${constants.ROOT_URL}/server-settings`, {
+      method: "PUT",
+      headers: this.header(),
+      credentials: "same-origin",
+      body: JSON.stringify(settings),
+    }).then(async (r) => {
+      if (!r.ok) {
+        let msg = r.statusText;
+        try {
+          const j = await r.json();
+          if (j.error) msg = j.error;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      return r.json();
+    });
+  }
+
   getDocumentMetadata(id) {
     return fetch(`${constants.ROOT_URL}/documents/${id}/metadata`, {
       method: "GET",
@@ -315,6 +344,10 @@ class ApiServices {
 
   getDocumentPagePngUrl(id, pageNum) {
     return `${constants.ROOT_URL}/documents/${id}/page/${pageNum}`;
+  }
+
+  getDocumentPageThumbUrl(id, pageNum) {
+    return `${constants.ROOT_URL}/documents/${id}/page/${pageNum}/thumb`;
   }
 
   /** Cover image URL for EPUB thumbnails (cover.htm/html/xhtml, or *0000.xhtml first img). */

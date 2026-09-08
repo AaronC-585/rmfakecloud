@@ -15,8 +15,9 @@ const EnvV6PNGScript = "RMFAKECLOUD_V6_PNG_SCRIPT"
 const EnvRepoRoot = "RMFAKECLOUD_ROOT"
 
 // EncodeRmPageToPNG converts raw .rm page bytes to PNG (1404×1872).
-// v3/v5: rendered in Go (RenderWritingsPNG).
-// v6: requires python3 and scripts/rmscene_v6_to_png.py (see EnvV6PNGScript / EnvRepoRoot).
+// v3: prefers lines2png when installed (no silent polyline fallback if the tool exists).
+// v5: Go RenderWritingsPNG.
+// v6: prefers rmc→PDF→OOP raster; falls back to scripts/rmscene_v6_to_png.py.
 func EncodeRmPageToPNG(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty .rm data")
@@ -30,6 +31,9 @@ func EncodeRmPageToPNG(data []byte) ([]byte, error) {
 		// Prefer lines-are-beautiful for stroke-faithful v3 rendering when installed.
 		if png, err := RenderV3PNGWithLines2PNG(data); err == nil {
 			return png, nil
+		} else if Lines2PNGAvailable() {
+			// Tool exists but failed — do not silently degrade to black polylines.
+			return nil, fmt.Errorf("lines2png available but failed: %w", err)
 		}
 		page, err := DecodeLegacy(data)
 		if err != nil {
@@ -50,6 +54,11 @@ func EncodeRmPageToPNG(data []byte) ([]byte, error) {
 }
 
 func encodeV6RmToPNG(data []byte) ([]byte, error) {
+	// Prefer rmc (production-grade strokes) → PDF → OOP raster, like device fidelity.
+	if png, err := RenderV6PNGWithRMC(data); err == nil {
+		return png, nil
+	}
+
 	script := os.Getenv(EnvV6PNGScript)
 	if script == "" {
 		if root := os.Getenv(EnvRepoRoot); root != "" {
@@ -57,7 +66,7 @@ func encodeV6RmToPNG(data []byte) ([]byte, error) {
 		}
 	}
 	if script == "" {
-		return nil, fmt.Errorf("v6 .rm requires %s or %s pointing to scripts/rmscene_v6_to_png.py", EnvV6PNGScript, EnvRepoRoot)
+		return nil, fmt.Errorf("v6 .rm requires rmc (set %s/%s) or %s/%s for scripts/rmscene_v6_to_png.py", EnvRMCBin, EnvRMCSrc, EnvV6PNGScript, EnvRepoRoot)
 	}
 	if st, err := os.Stat(script); err != nil || st.IsDir() {
 		return nil, fmt.Errorf("v6 PNG script %q: %w", script, err)

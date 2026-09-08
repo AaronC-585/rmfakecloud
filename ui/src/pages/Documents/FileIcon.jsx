@@ -31,31 +31,12 @@ export default function FileIcon({ file, showThumbnail = false }) {
 
     if (file.type === "pdf") {
       if (showThumbnail && file?.id) {
-        if (file.hasWritings) {
-          return (
-            <DocumentPageThumb
-              docId={file.id}
-              pageNum={1}
-              alt={file.name || "PDF"}
-              layered
-              fallback={<BsFilePdf />}
-            />
-          );
-        }
         return (
-          <img
-            src={apiservice.getDocumentPageBackgroundUrl(file.id, 1)}
+          <DocumentPageThumb
+            docId={file.id}
+            pageNum={1}
             alt={file.name || "PDF"}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: 68,
-              height: 88,
-              objectFit: "cover",
-              borderRadius: 3,
-              border: "1px solid #dee2e6",
-              background: "#fff",
-            }}
+            fallback={<BsFilePdf />}
           />
         );
       }
@@ -90,7 +71,6 @@ export default function FileIcon({ file, showThumbnail = false }) {
             docId={file.id}
             pageNum={1}
             alt={file.name || "Notebook"}
-            layered
             fallback={<BsFileEarmarkText />}
           />
         );
