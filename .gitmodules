@@ -4,3 +4,6 @@
 [submodule "third_party/rmscene"]
 	path = third_party/rmscene
 	url = https://github.com/ricklupton/rmscene.git
+[submodule "third_party/rmc"]
+	path = third_party/rmc
+	url = https://github.com/ricklupton/rmc.git
