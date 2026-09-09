@@ -12,6 +12,19 @@
   width: 300px;
 }
 
+.brand {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: $foreground1;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .error {
   font-size: 0.8rem;
   color: $reject;

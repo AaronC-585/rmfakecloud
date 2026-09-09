@@ -288,6 +288,88 @@ class ApiServices {
       headers: this.header(),
     }).then((r) => handleError(r));
   }
+
+  listThemes() {
+    return fetch(`${constants.ROOT_URL}/themes`, {
+      method: "GET",
+      headers: this.header(),
+      credentials: "same-origin",
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  getTheme(id) {
+    return fetch(`${constants.ROOT_URL}/themes/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers: this.header(),
+      credentials: "same-origin",
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  getProfileTheme() {
+    return fetch(`${constants.ROOT_URL}/profile/theme`, {
+      method: "GET",
+      headers: this.header(),
+      credentials: "same-origin",
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  putProfileTheme(body) {
+    return fetch(`${constants.ROOT_URL}/profile/theme`, {
+      method: "PUT",
+      headers: this.header(),
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  saveTheme(body) {
+    return fetch(`${constants.ROOT_URL}/themes`, {
+      method: "POST",
+      headers: this.header(),
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  updateTheme(id, body) {
+    return fetch(`${constants.ROOT_URL}/themes/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: this.header(),
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  publishTheme(id, published = true) {
+    return fetch(`${constants.ROOT_URL}/themes/${encodeURIComponent(id)}/publish`, {
+      method: "POST",
+      headers: this.header(),
+      credentials: "same-origin",
+      body: JSON.stringify({ published }),
+    }).then(async (r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
+  deleteTheme(id) {
+    return fetch(`${constants.ROOT_URL}/themes/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: this.header(),
+      credentials: "same-origin",
+    }).then((r) => handleError(r));
+  }
 }
 
 function removeUser(){

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<theme id="default" name="Default" published="true">
+  <colors
+    background1="#212529"
+    background2="#0f0f0f"
+    foreground1="#f8f7f6"
+    foreground2="#e8e3d9"
+    foreground3="#e4dbaf"
+    action="#EE7B30"
+    accept="#00e676"
+    reject="#ff1744"
+  />
+  <icons
+    brand="cloud"
+    documents="folder"
+    integrations="puzzle"
+    connect="link"
+    screenshare="display"
+    admin="gear"
+    profile="person"
+  />
+  <layout>
+    <chrome
+      style="flat"
+      folder-color="#d4b483"
+      tab-color="#c4a574"
+      outline-color="#e8e3d9"
+      drawer-color="#4a4035"
+      label-color="#211e1c"
+    />
+    <nav brand-position="start" user-menu="end">
+      <item id="documents" visible="true"/>
+      <item id="integrations" visible="true"/>
+      <item id="connect" visible="true"/>
+      <item id="screenshare" visible="true"/>
+      <item id="admin" visible="true" admin-only="true"/>
+    </nav>
+    <login primary-button="end" passkey-button="start" show-brand="true"/>
+    <connect
+      gauge-type="circle"
+      track-color="#3a3f44"
+      fill-color="#EE7B30"
+      text-color="#f8f7f6"
+      prompt-location="above"
+      prompt-style="plain"
+      prompt-bg="#212529"
+      prompt-fg="#e8e3d9"
+      prompt-border="#e8e3d9"
+      font-family="system"
+      font-size="lg"
+      code-color="#f8f7f6"
+    />
+    <mobile>
+      <chrome
+        style="tabbed"
+        folder-color="#d4b483"
+        tab-color="#c4a574"
+        outline-color="#e8e3d9"
+        drawer-color="#4a4035"
+        label-color="#211e1c"
+      />
+      <nav brand-position="start" user-menu="end">
+        <item id="documents" visible="true"/>
+        <item id="integrations" visible="true"/>
+        <item id="connect" visible="true"/>
+        <item id="screenshare" visible="false"/>
+        <item id="admin" visible="true" admin-only="true"/>
+      </nav>
+      <login primary-button="end" passkey-button="start" show-brand="true"/>
+      <connect
+        gauge-type="bar"
+        track-color="#3a3f44"
+        fill-color="#EE7B30"
+        text-color="#f8f7f6"
+        prompt-location="above"
+        prompt-style="boxed"
+        prompt-bg="#212529"
+        prompt-fg="#e8e3d9"
+        prompt-border="#EE7B30"
+        font-family="system"
+        font-size="md"
+        code-color="#f8f7f6"
+      />
+    </mobile>
+  </layout>
+</theme>

@@ -1,0 +1,99 @@
+.page {
+  height: 100%;
+  overflow: auto;
+}
+
+.stack {
+  margin-top: 10vh;
+  padding-bottom: 3rem;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 36rem;
+  text-align: center;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 48rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.code {
+  letter-spacing: 0.35em;
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.prompt {
+  margin: 0;
+  max-width: 28rem;
+  line-height: 1.4;
+}
+
+.prompt_plain {
+  border: none;
+  background: transparent;
+}
+
+.prompt_boxed {
+  border: 1px solid;
+  border-radius: 0.35rem;
+  padding: 0.75rem 1rem;
+}
+
+.prompt_pill {
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 0.65rem 1.25rem;
+}
+
+.prompt_banner {
+  border-left: 4px solid;
+  border-radius: 0.25rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  text-align: left;
+}
+
+.timerOnly {
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+}
+
+:global(.connect-gauge) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+:global(.connect-gauge-bar) {
+  width: min(280px, 80vw);
+}
+
+:global(.connect-gauge-bar-track) {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+:global(.connect-gauge-bar-fill) {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s linear;
+}
+
+:global(.connect-gauge-label) {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}

@@ -6,6 +6,8 @@ import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/br
 import { useAuthState } from "../../common/useAuthContext";
 import { loginUser } from "../../common/actions";
 import apiService from "../../services/api.service";
+import { useShellTheme } from "../../common/ThemeContext";
+import { ThemeIcon } from "../../common/themeIcons";
 
 import styles from "./Login.module.scss";
 
@@ -15,6 +17,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const { layout } = useShellTheme();
 
   const { state, dispatch } = useAuthState();
   const { errorMessage, loading } = state;
@@ -70,9 +73,35 @@ const Login = () => {
     }
   };
 
+  const loginBtn = (
+    <Button type="submit" onClick={handleLogin} disabled={loading || passkeyBusy}>
+      Login
+    </Button>
+  );
+  const passkeyBtn = passkeyEnabled ? (
+    <Button
+      type="button"
+      variant="outline-secondary"
+      className="ms-2 me-2"
+      onClick={handlePasskeyLogin}
+      disabled={loading || passkeyBusy}
+    >
+      Sign in with passkey
+    </Button>
+  ) : null;
+
+  const primaryEnd = layout?.login?.primaryButton !== "start";
+  const passkeyStart = layout?.login?.passkeyButton === "start";
+
   return (
     <div className={styles.container}>
       <div className={styles.formContainer}>
+        {layout?.login?.showBrand !== false ? (
+          <p className={styles.brand}>
+            <ThemeIcon name={layout?.icons?.brand || "cloud"} size={22} />
+            rmfakecloud
+          </p>
+        ) : null}
         {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
 
         <Form>
@@ -102,20 +131,12 @@ const Login = () => {
             />
           </Form.Group>
 
-          <Button type="submit" onClick={handleLogin} disabled={loading || passkeyBusy}>
-            Login
-          </Button>
-          {passkeyEnabled ? (
-            <Button
-              type="button"
-              variant="outline-secondary"
-              className="ms-2"
-              onClick={handlePasskeyLogin}
-              disabled={loading || passkeyBusy}
-            >
-              Sign in with passkey
-            </Button>
-          ) : null}
+          <div className={styles.buttonRow}>
+            {passkeyStart ? passkeyBtn : null}
+            {!primaryEnd ? loginBtn : null}
+            {!passkeyStart ? passkeyBtn : null}
+            {primaryEnd ? loginBtn : null}
+          </div>
         </Form>
       </div>
     </div>

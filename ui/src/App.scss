@@ -4,53 +4,62 @@
 
 :root {
     height:100%;
-    --bs-code-color: #{$action} !important;
-    --bs-body-bg: #{$background1} !important;
-    --bs-border-color: #{$foreground2} !important;
-    --bs-tertiary-bg: #{$background1} !important;
+    --rm-bg-1: rgb(33, 37, 41);
+    --rm-bg-2: #0f0f0f;
+    --rm-fg-1: #f8f7f6;
+    --rm-fg-2: #e8e3d9;
+    --rm-fg-3: #e4dbaf;
+    --rm-action: #EE7B30;
+    --rm-accept: #00e676;
+    --rm-reject: #ff1744;
+
+    --bs-code-color: var(--rm-action) !important;
+    --bs-body-bg: var(--rm-bg-1) !important;
+    --bs-border-color: var(--rm-fg-2) !important;
+    --bs-tertiary-bg: var(--rm-bg-1) !important;
 
     .dropdown-item {
-        --bs-dropdown-link-hover-bg: #{$background2};
-        --bs-dropdown-link-active-bg: #{$action};
+        --bs-dropdown-link-hover-bg: var(--rm-bg-2);
+        --bs-dropdown-link-active-bg: var(--rm-action);
     }
 
     .btn-outline-secondary {
-        --bs-btn-color: #{$foreground2};
-        --bs-btn-border-color: #{$foreground2};
+        --bs-btn-color: var(--rm-fg-2);
+        --bs-btn-border-color: var(--rm-fg-2);
     }
 
     .btn-primary {
-        --bs-btn-bg: #{$foreground2};
-        --bs-btn-color: #{$background1};
-        --bs-btn-border-color: #{$foreground2};
+        --bs-btn-bg: var(--rm-fg-2);
+        --bs-btn-color: var(--rm-bg-1);
+        --bs-btn-border-color: var(--rm-fg-2);
 
-        --bs-btn-hover-bg: #{$action};
-        --bs-btn-hover-color: #{$foreground2};
-        --bs-btn-hover-border-color: #{$action};
+        --bs-btn-hover-bg: var(--rm-action);
+        --bs-btn-hover-color: var(--rm-fg-2);
+        --bs-btn-hover-border-color: var(--rm-action);
 
-        --bs-btn-active-bg: #{$action};
-        --bs-btn-active-color: #{$background2};
-        --bs-btn-active-border-color: #{$action};
+        --bs-btn-active-bg: var(--rm-action);
+        --bs-btn-active-color: var(--rm-bg-2);
+        --bs-btn-active-border-color: var(--rm-action);
 
         --bs-btn-active-shadow: none;
-        --bs-btn-focus-shadow-rgb: none; // #{$action-rgb};
+        --bs-btn-focus-shadow-rgb: none;
     }
 
     .btn-danger {
-        --bs-btn-bg: #{$reject};
-        --bs-btn-color: #{$foreground2};
-        --bs-btn-border-color: #{$reject};
+        --bs-btn-bg: var(--rm-reject);
+        --bs-btn-color: var(--rm-fg-2);
+        --bs-btn-border-color: var(--rm-reject);
 
-        --bs-btn-hover-bg: #{$reject};
-        --bs-btn-hover-color: #{$foreground2};
-        --bs-btn-hover-border-color: #{$reject};
+        --bs-btn-hover-bg: var(--rm-reject);
+        --bs-btn-hover-color: var(--rm-fg-2);
+        --bs-btn-hover-border-color: var(--rm-reject);
 
-        --bs-btn-active-bg: #{$reject};
-        --bs-btn-active-color: #{$background2};
-        --bs-btn-active-border-color: #{$reject};
+        --bs-btn-active-bg: var(--rm-reject);
+        --bs-btn-active-color: var(--rm-bg-2);
+        --bs-btn-active-border-color: var(--rm-reject);
 
         --bs-btn-active-shadow: none;
-        --bs-btn-focus-shadow-rgb: none; // #{$action-rgb};
+        --bs-btn-focus-shadow-rgb: none;
 
         &:hover, &:focus {
             opacity: 0.7;
@@ -59,8 +68,8 @@
 }
 
 .form-control:focus {
-    border-color: $action !important;
-    box-shadow: none !important; // 0 0 0 0.25rem rgba(var(--bs-btn-focus-shadow-rgb), 10%) !important;
+    border-color: var(--rm-action) !important;
+    box-shadow: none !important;
 }
 
 .card input {
@@ -69,13 +78,13 @@
 
 #root > nav { 
     backdrop-filter: blur(12px);
-    background-color: $background1;
+    background-color: var(--rm-bg-1);
 }
 
 html, body {
     height: 100%;
     overflow: hidden;
-    background-color: $background2;
+    background-color: var(--rm-bg-2);
 }
 
 #root {

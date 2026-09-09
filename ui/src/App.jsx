@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify';
 
 import apiService from "./services/api.service";
 import { AuthProvider } from "./common/useAuthContext";
+import { ThemeProvider } from "./common/ThemeContext";
 import Role from "./common/Role";
 import { PrivateRoute } from "./components/PrivateRoute";
 import Navigationbar from "./components/Navigation";
@@ -16,6 +17,7 @@ import Documents from "./pages/Documents";
 import Integrations from "./pages/Integrations";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import ThemeStudio from "./pages/Admin/ThemeStudio";
 import ScreenShare from "./pages/ScreenShare";
 import NoMatch from "./pages/404";
 
@@ -38,6 +40,7 @@ export default function App() {
   return (
     <>
       <AuthProvider>
+        <ThemeProvider>
         <Router>
           <div style={{display: "flex", flexDirection: "column", height: "100%"}}>
             <Navigationbar />
@@ -52,6 +55,7 @@ export default function App() {
                 <PrivateRoute path="/integrations" component={Integrations} />
                 <PrivateRoute path="/profile" component={Profile} />
                 <PrivateRoute path="/screenshare" component={ScreenShare} />
+                <PrivateRoute path="/admin/themes" roles={[Role.Admin]} component={ThemeStudio} />
                 <PrivateRoute path="/admin" roles={[Role.Admin]} component={Admin} />
 
                 <Route path="/login" component={Login} />
@@ -60,6 +64,7 @@ export default function App() {
             </div>
           </div>
         </Router>
+        </ThemeProvider>
       </AuthProvider>
       <ToastContainer autoClose={2000} />
     </>

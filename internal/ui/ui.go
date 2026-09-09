@@ -81,6 +81,7 @@ type ReactAppWrapper struct {
 	mqtt          mqttBridge
 	webAuthn         *webauthn.WebAuthn
 	webAuthnSessions *webAuthnSessionStore
+	themes           *themeStore
 }
 
 // hack for serving index.html on /
@@ -124,6 +125,7 @@ func New(cfg *config.Config,
 		},
 		roomManager: roomManager,
 		mqtt:        mqttBroker,
+		themes:      newThemeStore(cfg.DataDir),
 	}
 	if cfg != nil && cfg.WebAuthn {
 		wa, err := webauthn.New(&webauthn.Config{

@@ -1,12 +1,12 @@
-//$background1: #211E1C;
-$background1: rgb(33,37,41);
-$background2: #0f0f0f;
+// Fallback palette; live themes override via --rm-* from XSLT (ThemeProvider).
+$background1: var(--rm-bg-1, rgb(33, 37, 41));
+$background2: var(--rm-bg-2, #0f0f0f);
 
-$foreground1: #f8f7f6;
-$foreground2: #e8e3d9;
-$foreground3: #e4dbaf;
+$foreground1: var(--rm-fg-1, #f8f7f6);
+$foreground2: var(--rm-fg-2, #e8e3d9);
+$foreground3: var(--rm-fg-3, #e4dbaf);
 
 $action-rgb: 238, 123, 48;
-$action: #EE7B30;
-$accept: #00e676;
-$reject: #ff1744;
+$action: var(--rm-action, #ee7b30);
+$accept: var(--rm-accept, #00e676);
+$reject: var(--rm-reject, #ff1744);

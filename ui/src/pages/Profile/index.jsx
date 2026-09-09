@@ -4,21 +4,19 @@ import { useAuthState } from "../../common/useAuthContext";
 
 import ResetPassword from "./ResetPassword";
 import Passkeys from "./Passkeys";
+import ThemePicker from "./ThemePicker";
 
 const Home = () => {
   const { state: { user } } = useAuthState();
   return (
-    <Container fluid>
-      <Stack>
+    <Container fluid style={{ overflow: "auto", height: "100%" }}>
+      <Stack gap={4} className="py-3">
         <div>
           {user.scopes === "sync15" && (<span>Using sync 15</span>)}
         </div>
-        <div>
-          <Passkeys />
-        </div>
-        <div>
-          <ResetPassword />
-        </div>
+        <ThemePicker />
+        <Passkeys />
+        <ResetPassword />
       </Stack>
     </Container>
   );

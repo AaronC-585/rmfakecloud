@@ -40,6 +40,8 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	r.GET("webauthn/status", app.webAuthnStatus)
 	r.POST("webauthn/login/begin", app.webAuthnLoginBegin)
 	r.POST("webauthn/login/finish", app.webAuthnLoginFinish)
+	r.GET("themes/assets/:name", app.getThemeAsset)
+	r.GET("themes/:id", app.getThemePublic)
 	r.GET("logout", func(c *gin.Context) {
 		c.SetCookie(cookieName, "/", -1, "", "", false, true)
 		c.Status(http.StatusOK)
@@ -66,12 +68,16 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 
 	// auth.GET("profile", app.newCode)
 	auth.POST("profile", app.changePassword)
+	auth.GET("profile/theme", app.getProfileTheme)
+	auth.PUT("profile/theme", app.putProfileTheme)
 	// auth.POST("changeEmail", app.changePassword)
 
 	auth.POST("webauthn/register/begin", app.webAuthnRegisterBegin)
 	auth.POST("webauthn/register/finish", app.webAuthnRegisterFinish)
 	auth.GET("webauthn/credentials", app.webAuthnListCredentials)
 	auth.DELETE("webauthn/credentials/:id", app.webAuthnDeleteCredential)
+
+	auth.GET("themes", app.listThemes)
 
 	auth.GET("documents", app.listDocuments)
 	auth.GET("documents/:docid", app.getDocument)
@@ -109,4 +115,8 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	admin.PUT("users", app.updateUser)
 	admin.POST("users", app.createUser)
 	admin.GET("users", app.getAppUsers)
+	admin.POST("themes", app.saveTheme)
+	admin.PUT("themes/:id", app.updateTheme)
+	admin.POST("themes/:id/publish", app.publishTheme)
+	admin.DELETE("themes/:id", app.deleteTheme)
 }
