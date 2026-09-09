@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/common"
@@ -113,7 +115,7 @@ func (app *ReactAppWrapper) login(c *gin.Context) {
 	}
 
 	// Try to find the user
-	user, err := app.userStorer.GetUser(form.Email)
+	user, err := app.findUserForLogin(form.Email)
 	if err != nil {
 		log.Error(uiLogger, err, " cannot load user, login failed ip: ", c.ClientIP())
 		c.AbortWithStatus(http.StatusUnauthorized)
@@ -296,6 +298,35 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 	}
 
 	c.DataFromReader(http.StatusOK, -1, "application/octet-stream", reader, nil)
+}
+
+func (app *ReactAppWrapper) getDocumentPage(c *gin.Context) {
+	uid := userID(c)
+	docid := common.ParamS(docIDParam, c)
+	pagenum, err := strconv.Atoi(c.Param("pagenum"))
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	type pagePNGExporter interface {
+		ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	}
+	backend := app.getBackend(c)
+	pe, ok := backend.(pagePNGExporter)
+	if !ok {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	reader, err := pe.ExportPagePNG(uid, docid, pagenum)
+	if err != nil {
+		log.Error(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+	c.Header("Content-Type", "image/png")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.DataFromReader(http.StatusOK, -1, "image/png", reader, nil)
 }
 
 func (app *ReactAppWrapper) getDocumentMetadata(c *gin.Context) {
@@ -903,4 +934,3 @@ func (app *ReactAppWrapper) screenshareDeleteRoom(c *gin.Context) {
 	app.roomManager.DeleteAllForUser(uid)
 	c.Status(http.StatusNoContent)
 }
-

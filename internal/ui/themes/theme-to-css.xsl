@@ -11,48 +11,90 @@
     </xsl:choose>
   </xsl:template>
 
-  <xsl:template match="/theme">
+  <xsl:template name="emit-palette">
+    <xsl:param name="colors"/>
+    <xsl:param name="chrome"/>
+    <xsl:param name="connect"/>
+    <xsl:param name="use-connect"/>
+    <xsl:param name="scheme"/>
     <xsl:variable name="fontFamily">
       <xsl:call-template name="or-default">
-        <xsl:with-param name="value" select="layout/connect/@font-family"/>
+        <xsl:with-param name="value" select="$connect/@font-family"/>
         <xsl:with-param name="fallback" select="'system'"/>
       </xsl:call-template>
     </xsl:variable>
     <xsl:variable name="fontSize">
       <xsl:call-template name="or-default">
-        <xsl:with-param name="value" select="layout/connect/@font-size"/>
+        <xsl:with-param name="value" select="$connect/@font-size"/>
         <xsl:with-param name="fallback" select="'lg'"/>
       </xsl:call-template>
     </xsl:variable>
-    <xsl:text>:root {
-  --rm-bg-1: </xsl:text><xsl:value-of select="colors/@background1"/><xsl:text>;
-  --rm-bg-2: </xsl:text><xsl:value-of select="colors/@background2"/><xsl:text>;
-  --rm-fg-1: </xsl:text><xsl:value-of select="colors/@foreground1"/><xsl:text>;
-  --rm-fg-2: </xsl:text><xsl:value-of select="colors/@foreground2"/><xsl:text>;
-  --rm-fg-3: </xsl:text><xsl:value-of select="colors/@foreground3"/><xsl:text>;
-  --rm-action: </xsl:text><xsl:value-of select="colors/@action"/><xsl:text>;
-  --rm-accept: </xsl:text><xsl:value-of select="colors/@accept"/><xsl:text>;
-  --rm-reject: </xsl:text><xsl:value-of select="colors/@reject"/><xsl:text>;
+    <xsl:text>  color-scheme: </xsl:text><xsl:value-of select="$scheme"/><xsl:text>;
+  --rm-color-scheme: </xsl:text><xsl:value-of select="$scheme"/><xsl:text>;
+  --rm-bg-1: </xsl:text><xsl:value-of select="$colors/@background1"/><xsl:text>;
+  --rm-bg-2: </xsl:text><xsl:value-of select="$colors/@background2"/><xsl:text>;
+  --rm-fg-1: </xsl:text><xsl:value-of select="$colors/@foreground1"/><xsl:text>;
+  --rm-fg-2: </xsl:text><xsl:value-of select="$colors/@foreground2"/><xsl:text>;
+  --rm-fg-3: </xsl:text><xsl:value-of select="$colors/@foreground3"/><xsl:text>;
+  --rm-action: </xsl:text><xsl:value-of select="$colors/@action"/><xsl:text>;
+  --rm-on-action: #111111;
+  --rm-accept: </xsl:text><xsl:value-of select="$colors/@accept"/><xsl:text>;
+  --rm-reject: </xsl:text><xsl:value-of select="$colors/@reject"/><xsl:text>;
   --rm-connect-gauge-track: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@track-color"/><xsl:with-param name="fallback" select="'#3a3f44'"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@track-color"/><xsl:with-param name="fallback" select="$colors/@background2"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@background2"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-gauge-fill: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@fill-color"/><xsl:with-param name="fallback" select="colors/@action"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@fill-color"/><xsl:with-param name="fallback" select="$colors/@action"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@action"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-gauge-text: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@text-color"/><xsl:with-param name="fallback" select="colors/@foreground1"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@text-color"/><xsl:with-param name="fallback" select="$colors/@foreground1"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@foreground1"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-prompt-bg: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@prompt-bg"/><xsl:with-param name="fallback" select="colors/@background1"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@prompt-bg"/><xsl:with-param name="fallback" select="$colors/@background1"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@background1"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-prompt-fg: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@prompt-fg"/><xsl:with-param name="fallback" select="colors/@foreground2"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@prompt-fg"/><xsl:with-param name="fallback" select="$colors/@foreground2"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@foreground2"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-prompt-border: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@prompt-border"/><xsl:with-param name="fallback" select="colors/@foreground2"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@prompt-border"/><xsl:with-param name="fallback" select="$colors/@foreground2"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@foreground2"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-code-color: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/connect/@code-color"/><xsl:with-param name="fallback" select="colors/@foreground1"/></xsl:call-template>
+    <xsl:choose>
+      <xsl:when test="$use-connect = 'yes'">
+        <xsl:call-template name="or-default"><xsl:with-param name="value" select="$connect/@code-color"/><xsl:with-param name="fallback" select="$colors/@foreground1"/></xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise><xsl:value-of select="$colors/@foreground1"/></xsl:otherwise>
+    </xsl:choose>
     <xsl:text>;
   --rm-connect-font-family: </xsl:text>
     <xsl:choose>
@@ -71,25 +113,60 @@
     </xsl:choose>
     <xsl:text>;
   --rm-chrome-folder: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/chrome/@folder-color"/><xsl:with-param name="fallback" select="'#d4b483'"/></xsl:call-template>
+    <xsl:call-template name="or-default"><xsl:with-param name="value" select="$chrome/@folder-color"/><xsl:with-param name="fallback" select="$colors/@action"/></xsl:call-template>
     <xsl:text>;
   --rm-chrome-tab: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/chrome/@tab-color"/><xsl:with-param name="fallback" select="'#c4a574'"/></xsl:call-template>
+    <xsl:call-template name="or-default"><xsl:with-param name="value" select="$chrome/@tab-color"/><xsl:with-param name="fallback" select="$colors/@action"/></xsl:call-template>
     <xsl:text>;
   --rm-chrome-outline: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/chrome/@outline-color"/><xsl:with-param name="fallback" select="colors/@foreground2"/></xsl:call-template>
+    <xsl:call-template name="or-default"><xsl:with-param name="value" select="$chrome/@outline-color"/><xsl:with-param name="fallback" select="$colors/@foreground2"/></xsl:call-template>
     <xsl:text>;
   --rm-chrome-drawer: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/chrome/@drawer-color"/><xsl:with-param name="fallback" select="'#4a4035'"/></xsl:call-template>
+    <xsl:call-template name="or-default"><xsl:with-param name="value" select="$chrome/@drawer-color"/><xsl:with-param name="fallback" select="$colors/@background2"/></xsl:call-template>
     <xsl:text>;
   --rm-chrome-label: </xsl:text>
-    <xsl:call-template name="or-default"><xsl:with-param name="value" select="layout/chrome/@label-color"/><xsl:with-param name="fallback" select="'#211e1c'"/></xsl:call-template>
+    <xsl:call-template name="or-default"><xsl:with-param name="value" select="$chrome/@label-color"/><xsl:with-param name="fallback" select="$colors/@foreground1"/></xsl:call-template>
     <xsl:text>;
-  --bs-body-bg: </xsl:text><xsl:value-of select="colors/@background1"/><xsl:text> !important;
-  --bs-border-color: </xsl:text><xsl:value-of select="colors/@foreground2"/><xsl:text> !important;
-  --bs-tertiary-bg: </xsl:text><xsl:value-of select="colors/@background1"/><xsl:text> !important;
-  --bs-code-color: </xsl:text><xsl:value-of select="colors/@action"/><xsl:text> !important;
+  --bs-body-bg: </xsl:text><xsl:value-of select="$colors/@background1"/><xsl:text> !important;
+  --bs-body-color: </xsl:text><xsl:value-of select="$colors/@foreground1"/><xsl:text> !important;
+  --bs-border-color: </xsl:text><xsl:value-of select="$colors/@foreground2"/><xsl:text> !important;
+  --bs-tertiary-bg: </xsl:text><xsl:value-of select="$colors/@background1"/><xsl:text> !important;
+  --bs-code-color: </xsl:text><xsl:value-of select="$colors/@action"/><xsl:text> !important;
+</xsl:text>
+  </xsl:template>
+
+  <xsl:template match="/theme">
+    <xsl:variable name="scheme">
+      <xsl:choose>
+        <xsl:when test="@id = 'light' or @id = 'system'">light</xsl:when>
+        <xsl:otherwise>dark</xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+    <xsl:text>:root {
+</xsl:text>
+    <xsl:call-template name="emit-palette">
+      <xsl:with-param name="colors" select="colors"/>
+      <xsl:with-param name="chrome" select="layout/chrome"/>
+      <xsl:with-param name="connect" select="layout/connect"/>
+      <xsl:with-param name="use-connect" select="'yes'"/>
+      <xsl:with-param name="scheme" select="$scheme"/>
+    </xsl:call-template>
+    <xsl:text>}
+</xsl:text>
+    <xsl:if test="colors-dark">
+      <xsl:text>@media (prefers-color-scheme: dark) {
+:root {
+</xsl:text>
+      <xsl:call-template name="emit-palette">
+        <xsl:with-param name="colors" select="colors-dark"/>
+        <xsl:with-param name="chrome" select="layout/chrome"/>
+        <xsl:with-param name="connect" select="layout/connect"/>
+        <xsl:with-param name="use-connect" select="'no'"/>
+        <xsl:with-param name="scheme" select="'dark'"/>
+      </xsl:call-template>
+      <xsl:text>}
 }
 </xsl:text>
+    </xsl:if>
   </xsl:template>
 </xsl:stylesheet>

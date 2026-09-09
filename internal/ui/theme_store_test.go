@@ -57,3 +57,33 @@ func TestBuiltinDefault(t *testing.T) {
 		t.Fatalf("builtin default: err=%v builtin=%v len=%d", err, builtin, len(b))
 	}
 }
+
+func TestBuiltinPalettesListed(t *testing.T) {
+	s := newThemeStore(t.TempDir())
+	list, err := s.list(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"light", "dark", "system", "hicontrast"}
+	got := map[string]bool{}
+	order := make([]string, 0, len(list))
+	for _, m := range list {
+		got[m.ID] = true
+		order = append(order, m.ID)
+		if m.ID == "default" {
+			t.Fatal("default should be hidden when dark exists")
+		}
+	}
+	for _, id := range want {
+		if !got[id] {
+			t.Fatalf("missing builtin %s in %v", id, order)
+		}
+		xml, builtin, err := s.getXML(id)
+		if err != nil || !builtin || len(xml) == 0 {
+			t.Fatalf("%s: err=%v builtin=%v len=%d", id, err, builtin, len(xml))
+		}
+	}
+	if len(order) < 4 || order[0] != "light" || order[1] != "dark" || order[2] != "system" || order[3] != "hicontrast" {
+		t.Fatalf("unexpected order %v", order)
+	}
+}

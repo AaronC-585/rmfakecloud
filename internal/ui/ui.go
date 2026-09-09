@@ -2,10 +2,7 @@ package ui
 
 import (
 	"io"
-	"io/fs"
 	"net/http"
-	"path"
-	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
 	"github.com/ddvk/rmfakecloud/internal/app/passcodestore"
@@ -16,7 +13,6 @@ import (
 	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
-	webui "github.com/ddvk/rmfakecloud/ui"
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/webauthn"
 	log "github.com/sirupsen/logrus"
@@ -53,6 +49,7 @@ type blobHandler interface {
 	CreateBlobFolder(uid, name, parent string) (doc *storage.Document, err error)
 	Export(uid, docid string) (io.ReadCloser, error)
 	ExportRmDoc(uid, docid string) (io.ReadCloser, error)
+	ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error)
 }
 
 type notificationHub interface {
@@ -67,28 +64,24 @@ type mqttBridge interface {
 	HasConnectedClient(userID string) bool
 }
 
-// ReactAppWrapper encapsulates an app
+// ReactAppWrapper encapsulates the web UI (XML/XSLT pages + JSON APIs).
 type ReactAppWrapper struct {
-	fs            http.FileSystem
-	prefix        string
-	cfg           *config.Config
-	userStorer    storage.UserStorer
-	codeConnector codeGenerator
-	h             *hub.Hub
-	passcodeStore passcodestore.Store
-	backends      map[common.SyncVersion]backend
-	roomManager   *screenshare.RoomManager
-	mqtt          mqttBridge
+	fs               http.FileSystem
+	prefix           string
+	cfg              *config.Config
+	userStorer       storage.UserStorer
+	codeConnector    codeGenerator
+	h                *hub.Hub
+	passcodeStore    passcodestore.Store
+	backends         map[common.SyncVersion]backend
+	roomManager      *screenshare.RoomManager
+	mqtt             mqttBridge
 	webAuthn         *webauthn.WebAuthn
 	webAuthnSessions *webAuthnSessionStore
 	themes           *themeStore
 }
 
-// hack for serving index.html on /
-const indexReplacement = "/default"
-const jsBuildFolder = "dist"
-
-// New Create a React app
+// New creates the web UI app.
 func New(cfg *config.Config,
 	userStorer storage.UserStorer,
 	codeConnector codeGenerator,
@@ -99,10 +92,6 @@ func New(cfg *config.Config,
 	roomManager *screenshare.RoomManager,
 	mqttBroker mqttBridge) *ReactAppWrapper {
 
-	sub, err := fs.Sub(webui.Assets, jsBuildFolder)
-	if err != nil {
-		panic("not embedded?")
-	}
 	backend15 := &backend15{
 		blobHandler: blobHandler,
 		h:           h,
@@ -111,8 +100,7 @@ func New(cfg *config.Config,
 		documentHandler: docHandler,
 		hub:             h,
 	}
-	staticWrapper := ReactAppWrapper{
-		fs:            common.NewLastModifiedFS(http.FS(sub), time.Now()),
+	staticWrapper := &ReactAppWrapper{
 		prefix:        "/assets",
 		cfg:           cfg,
 		userStorer:    userStorer,
@@ -127,6 +115,7 @@ func New(cfg *config.Config,
 		mqtt:        mqttBroker,
 		themes:      newThemeStore(cfg.DataDir),
 	}
+	staticWrapper.initStatic()
 	if cfg != nil && cfg.WebAuthn {
 		wa, err := webauthn.New(&webauthn.Config{
 			RPDisplayName: "rmfakecloud",
@@ -140,21 +129,9 @@ func New(cfg *config.Config,
 			staticWrapper.webAuthnSessions = newWebAuthnSessionStore()
 		}
 	}
-	return &staticWrapper
+	return staticWrapper
 }
 
-// Open opens a file from the fs (virtual)
-func (w ReactAppWrapper) Open(filepath string) (http.File, error) {
-	fullpath := filepath
-	//index.html hack
-	if filepath != indexReplacement {
-		fullpath = path.Join(w.prefix, filepath)
-	} else {
-		fullpath = "/index.html"
-	}
-	f, err := w.fs.Open(fullpath)
-	return f, err
-}
 func badReq(c *gin.Context, message string) {
 	c.AbortWithStatusJSON(http.StatusBadRequest, viewmodel.NewErrorResponse(message))
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<theme id="default" name="Default" published="true">
+<theme id="default" name="Dark" published="true">
   <colors
     background1="#212529"
     background2="#0f0f0f"
@@ -21,12 +21,12 @@
   />
   <layout>
     <chrome
-      style="flat"
-      folder-color="#d4b483"
-      tab-color="#c4a574"
+      style="remarkable"
+      folder-color="#EE7B30"
+      tab-color="#EE7B30"
       outline-color="#e8e3d9"
-      drawer-color="#4a4035"
-      label-color="#211e1c"
+      drawer-color="#0f0f0f"
+      label-color="#f8f7f6"
     />
     <nav brand-position="start" user-menu="end">
       <item id="documents" visible="true"/>
@@ -34,6 +34,8 @@
       <item id="connect" visible="true"/>
       <item id="screenshare" visible="true"/>
       <item id="admin" visible="true" admin-only="true"/>
+      <item id="help" visible="true"/>
+      <item id="profile" visible="true"/>
     </nav>
     <login primary-button="end" passkey-button="start" show-brand="true"/>
     <connect
@@ -52,19 +54,21 @@
     />
     <mobile>
       <chrome
-        style="tabbed"
-        folder-color="#d4b483"
-        tab-color="#c4a574"
+        style="remarkable"
+        folder-color="#EE7B30"
+        tab-color="#EE7B30"
         outline-color="#e8e3d9"
-        drawer-color="#4a4035"
-        label-color="#211e1c"
+        drawer-color="#0f0f0f"
+        label-color="#f8f7f6"
       />
       <nav brand-position="start" user-menu="end">
         <item id="documents" visible="true"/>
         <item id="integrations" visible="true"/>
         <item id="connect" visible="true"/>
-        <item id="screenshare" visible="false"/>
+        <item id="screenshare" visible="true"/>
         <item id="admin" visible="true" admin-only="true"/>
+        <item id="help" visible="true"/>
+        <item id="profile" visible="true"/>
       </nav>
       <login primary-button="end" passkey-button="start" show-brand="true"/>
       <connect

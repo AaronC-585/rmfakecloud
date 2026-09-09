@@ -5,14 +5,17 @@ go 1.23.3
 toolchain go1.24.1
 
 require (
+	github.com/antchfx/xmlquery v1.4.4
 	github.com/apognu/gocal v0.9.1
 	github.com/danjacques/gofslock v0.0.0-20240212154529-d899e02bfe22
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
+	github.com/fogleman/gg v1.3.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-webauthn/webauthn v0.11.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/juruen/rmapi v0.0.25
 	github.com/mochi-mqtt/server/v2 v2.7.9
 	github.com/poundifdef/go-remarkable2pdf v0.2.0
@@ -31,6 +34,7 @@ require (
 	github.com/adrg/strutil v0.3.1 // indirect
 	github.com/adrg/sysfont v0.1.2 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
+	github.com/antchfx/xpath v1.3.4 // indirect
 	github.com/bytedance/sonic v1.11.3 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
@@ -44,12 +48,12 @@ require (
 	github.com/go-webauthn/x v0.1.14 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-tpm v0.9.1 // indirect
 	github.com/gorilla/i18n v0.0.0-20150820051429-8b358169da46 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/jung-kurt/gofpdf v1.16.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -46,6 +46,10 @@ func (b *backend15) DeleteDocument(uid, docID string) (err error) {
 	return b.blobHandler.DeleteBlobDocument(uid, docID)
 }
 
+func (b *backend15) ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
+	return b.blobHandler.ExportPagePNG(uid, docid, pageNum)
+}
+
 func (b *backend15) Sync(uid string) {
 	b.h.NotifySync(uid, uuid.NewString())
 }

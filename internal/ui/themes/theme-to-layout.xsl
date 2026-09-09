@@ -24,6 +24,7 @@
         <xsl:for-each select="layout/nav/item">
           <item
             id="{@id}"
+            href="/{@id}"
             visible="{@visible}"
             admin-only="{@admin-only}"
             icon="{/theme/icons/@*[local-name()=current()/@id]}"

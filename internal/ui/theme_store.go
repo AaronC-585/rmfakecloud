@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -50,8 +51,11 @@ func (s *themeStore) list(includeUnpublished bool) ([]ThemeMeta, error) {
 
 	byID := map[string]ThemeMeta{}
 
-	// Built-in default
-	if meta, err := s.readBuiltinMeta("default"); err == nil {
+	for _, id := range s.builtinIDs() {
+		meta, err := s.readBuiltinMeta(id)
+		if err != nil {
+			continue
+		}
 		byID[meta.ID] = meta
 	}
 
@@ -74,14 +78,56 @@ func (s *themeStore) list(includeUnpublished bool) ([]ThemeMeta, error) {
 		byID[id] = meta
 	}
 
+	_, hasDark := byID["dark"]
 	out := make([]ThemeMeta, 0, len(byID))
 	for _, m := range byID {
 		if !includeUnpublished && !m.Published {
 			continue
 		}
+		if m.ID == "default" && hasDark {
+			continue
+		}
 		out = append(out, m)
 	}
+	sortThemes(out)
 	return out, nil
+}
+
+func (s *themeStore) builtinIDs() []string {
+	entries, err := fs.ReadDir(builtinThemesFS, "themes")
+	if err != nil {
+		return []string{"default"}
+	}
+	ids := make([]string, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".xml") {
+			continue
+		}
+		id := strings.TrimSuffix(name, ".xml")
+		if themeIDPattern.MatchString(id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func sortThemes(out []ThemeMeta) {
+	rank := map[string]int{"light": 0, "dark": 1, "system": 2, "hicontrast": 3}
+	sort.Slice(out, func(i, j int) bool {
+		ri, iok := rank[out[i].ID]
+		rj, jok := rank[out[j].ID]
+		if iok && jok {
+			return ri < rj
+		}
+		if iok {
+			return true
+		}
+		if jok {
+			return false
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
 }
 
 func (s *themeStore) getXML(id string) ([]byte, bool, error) {
@@ -145,8 +191,8 @@ func (s *themeStore) setPublished(id string, published bool) error {
 }
 
 func (s *themeStore) delete(id string) error {
-	if id == "default" {
-		return errors.New("cannot delete built-in default theme")
+	if id == "default" || id == "light" || id == "dark" || id == "system" || id == "hicontrast" {
+		return errors.New("cannot delete a built-in theme")
 	}
 	if !themeIDPattern.MatchString(id) {
 		return errors.New("invalid theme id")
