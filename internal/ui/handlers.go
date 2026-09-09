@@ -296,6 +296,13 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 	if exportType == "rmdoc" {
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.rmdoc\"", docid))
 	}
+	if exportType == "epub" {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.epub\"", docid))
+		c.Header("Content-Type", "application/epub+zip")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.DataFromReader(http.StatusOK, -1, "application/epub+zip", reader, nil)
+		return
+	}
 
 	c.DataFromReader(http.StatusOK, -1, "application/octet-stream", reader, nil)
 }

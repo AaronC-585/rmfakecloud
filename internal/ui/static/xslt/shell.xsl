@@ -549,6 +549,9 @@
                     <xsl:when test="@type = 'notebook'">
                       <img class="rm-thumb-img" src="/ui/api/documents/{@id}/page/{@thumb-page}" alt="" loading="lazy" decoding="async" width="180" height="240"/>
                     </xsl:when>
+                    <xsl:when test="@type = 'epub'">
+                      <img class="rm-thumb-img" src="/ui/api/documents/{@id}/epub/thumb" alt="" loading="lazy" decoding="async" width="180" height="240"/>
+                    </xsl:when>
                     <xsl:otherwise>
                       <span class="rm-page-placeholder" aria-hidden="true"></span>
                     </xsl:otherwise>
@@ -962,6 +965,74 @@
     </article>
   </xsl:template>
 
+  <!-- epub as a website -->
+  <xsl:template match="epub">
+    <article class="panel epub-panel">
+      <header class="epub-header">
+        <h1>
+          <xsl:choose>
+            <xsl:when test="@name != ''"><xsl:value-of select="@name"/></xsl:when>
+            <xsl:otherwise>EPUB</xsl:otherwise>
+          </xsl:choose>
+        </h1>
+        <p>
+          <a href="/documents">Back to documents</a>
+          <xsl:if test="@download-href != ''">
+            <xsl:text> · </xsl:text>
+            <a>
+              <xsl:attribute name="href"><xsl:value-of select="@download-href"/></xsl:attribute>
+              <xsl:attribute name="download"/>
+              Download EPUB
+            </a>
+          </xsl:if>
+        </p>
+      </header>
+      <div class="epub-layout">
+        <nav class="epub-toc" aria-label="Contents">
+          <h2>Contents</h2>
+          <ol>
+            <xsl:for-each select="spine/item">
+              <li>
+                <a target="epub-frame">
+                  <xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
+                  <xsl:attribute name="title"><xsl:value-of select="@path"/></xsl:attribute>
+                  <xsl:if test="@href = /page/body/epub/@start-href">
+                    <xsl:attribute name="aria-current">page</xsl:attribute>
+                  </xsl:if>
+                  <xsl:value-of select="@label"/>
+                </a>
+              </li>
+            </xsl:for-each>
+          </ol>
+        </nav>
+        <div class="epub-stage">
+          <xsl:choose>
+            <xsl:when test="@start-href != ''">
+              <iframe
+                id="epub-frame"
+                name="epub-frame"
+                class="epub-frame"
+                referrerpolicy="same-origin"
+              >
+                <xsl:attribute name="title">
+                  <xsl:choose>
+                    <xsl:when test="@name != ''"><xsl:value-of select="@name"/></xsl:when>
+                    <xsl:otherwise>EPUB</xsl:otherwise>
+                  </xsl:choose>
+                </xsl:attribute>
+                <xsl:attribute name="src"><xsl:value-of select="@start-href"/></xsl:attribute>
+                <xsl:comment>epub website</xsl:comment>
+              </iframe>
+            </xsl:when>
+            <xsl:otherwise>
+              <p class="muted">This EPUB could not be opened as a website.</p>
+            </xsl:otherwise>
+          </xsl:choose>
+        </div>
+      </div>
+    </article>
+  </xsl:template>
+
   <!-- error -->
   <xsl:template match="error">
     <article class="panel error-panel">
@@ -1030,6 +1101,9 @@
       </xsl:when>
       <xsl:when test="$kind = 'pdf'">
         <script src="/assets/js/pdfview.js" defer="defer"></script>
+      </xsl:when>
+      <xsl:when test="$kind = 'epub'">
+        <script src="/assets/js/epubview.js" defer="defer"></script>
       </xsl:when>
       <xsl:when test="$kind = 'themes'">
         <script src="/assets/js/theme-studio.js" defer="defer"></script>

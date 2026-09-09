@@ -134,6 +134,19 @@
           frame.classList.add("has-preview");
         });
         frame.appendChild(img);
+      } else if (t === "epub") {
+        var epubImg = document.createElement("img");
+        epubImg.className = "rm-thumb-img";
+        epubImg.width = 180;
+        epubImg.height = 240;
+        epubImg.alt = "";
+        epubImg.loading = "lazy";
+        epubImg.decoding = "async";
+        epubImg.src = "/ui/api/documents/" + encodeURIComponent(e.id) + "/epub/thumb";
+        epubImg.addEventListener("load", function () {
+          frame.classList.add("has-preview");
+        });
+        frame.appendChild(epubImg);
       } else {
         var ph = document.createElement("span");
         ph.className = "rm-page-placeholder";
@@ -259,6 +272,16 @@
   }
 
   function observeThumbs() {
+    document.querySelectorAll(".rm-page-frame .rm-thumb-img").forEach(function (img) {
+      function mark() {
+        if (img.naturalWidth) {
+          var frame = img.closest(".rm-page-frame");
+          if (frame) frame.classList.add("has-preview");
+        }
+      }
+      if (img.complete) mark();
+      else img.addEventListener("load", mark, { once: true });
+    });
     if (thumbObserver) thumbObserver.disconnect();
     var canvases = document.querySelectorAll(".rm-thumb-canvas[data-pdf-url]");
     if (!canvases.length) return;

@@ -11,6 +11,7 @@ import (
 	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/screenshare"
 	"github.com/ddvk/rmfakecloud/internal/storage"
+	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,11 @@ type blobHandler interface {
 	Export(uid, docid string) (io.ReadCloser, error)
 	ExportRmDoc(uid, docid string) (io.ReadCloser, error)
 	ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	GetEpub(uid, docid string) (io.ReadCloser, error)
+	GetEpubManifest(uid, docid string) (*epub.Manifest, error)
+	GetEpubFile(uid, docid, filePath string) (io.ReadCloser, string, error)
+	GetEpubCoverThumb(uid, docid string) (io.ReadCloser, string, error)
+	GetEpubPageThumb(uid, docid string, pageIndex0 int) (io.ReadCloser, string, error)
 }
 
 type notificationHub interface {

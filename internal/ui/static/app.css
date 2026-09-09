@@ -826,6 +826,10 @@ textarea {
 .rm-page-frame.has-preview {
   background-image: none;
 }
+.rm-page-frame.is-epub.has-preview {
+  background-image: linear-gradient(90deg, #2c2824 0 0.55rem, transparent 0.55rem);
+  background-color: #fff;
+}
 .rm-page-frame.is-pdf.has-preview,
 .rm-page-frame.is-notebook.has-preview {
   background-color: #fff;
@@ -846,6 +850,10 @@ textarea {
   max-width: none;
   object-fit: cover;
   object-position: top center;
+}
+.rm-page-frame.is-epub .rm-thumb-img {
+  left: 0.85rem;
+  width: calc(100% - 0.85rem);
 }
 .rm-file-meta {
   display: flex;
@@ -994,6 +1002,113 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* ----- EPUB website ----- */
+.page-epub .page-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 8rem);
+}
+.epub-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.epub-header {
+  padding: 1rem var(--rm-space) 0.5rem;
+}
+.epub-header h1 {
+  margin-bottom: 0.35rem;
+}
+.epub-header p {
+  margin: 0 0 0.75rem;
+}
+.epub-layout {
+  flex: 1;
+  display: flex;
+  min-height: 24rem;
+  min-width: 0;
+  border-top: 1px solid color-mix(in srgb, var(--rm-fg-2) 22%, transparent);
+  background: #fff;
+  color: #111;
+}
+.epub-toc {
+  width: min(18rem, 36vw);
+  overflow: auto;
+  border-right: 1px solid #d8d5d0;
+  background: #f6f4f0;
+  color: #111;
+}
+.epub-toc h2 {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #d8d5d0;
+  color: #333;
+}
+.epub-toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+}
+.epub-toc a {
+  display: block;
+  padding: 0.55rem 1rem;
+  color: #111;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.epub-toc a:hover,
+.epub-toc a:focus-visible {
+  background: #ece8e0;
+}
+.epub-toc a[aria-current="page"] {
+  background: #e2ddd4;
+  font-weight: 650;
+}
+.epub-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.epub-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 70vh;
+  border: 0;
+  background: #fff;
+}
+.epub-stage > p {
+  margin: 1.5rem;
+  color: #444;
+}
+
+@media (max-width: 720px) {
+  .epub-layout {
+    flex-direction: column;
+  }
+  .epub-toc {
+    width: 100%;
+    max-height: 10rem;
+    border-right: 0;
+    border-bottom: 1px solid #d8d5d0;
+  }
+  .epub-frame {
+    min-height: 60vh;
+  }
 }
 
 /* ----- Theme studio ----- */

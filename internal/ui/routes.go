@@ -104,6 +104,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 
 	auth.GET("documents", app.listDocuments)
 	auth.GET("documents/:docid", app.getDocument)
+	auth.GET("documents/:docid/epub/*path", app.getEpubPath)
 	auth.GET("documents/:docid/page/:pagenum", app.getDocumentPage)
 	auth.POST("documents/upload", app.createDocument)
 

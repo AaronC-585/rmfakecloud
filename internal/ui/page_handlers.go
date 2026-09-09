@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/model"
+	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/gin-gonic/gin"
@@ -369,6 +370,22 @@ func findFolderName(entries []viewmodel.Entry, id string) string {
 	return ""
 }
 
+func findDocument(entries []viewmodel.Entry, id string) *viewmodel.Document {
+	for _, e := range entries {
+		switch d := e.(type) {
+		case *viewmodel.Document:
+			if d.ID == id {
+				return d
+			}
+		case *viewmodel.Directory:
+			if found := findDocument(d.Entries, id); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
+}
+
 func (app *ReactAppWrapper) pagePDF(c *gin.Context) {
 	u := app.requirePageUser(c)
 	if u == nil {
@@ -378,10 +395,79 @@ func (app *ReactAppWrapper) pagePDF(c *gin.Context) {
 	_, css, chrome, _ := app.loadUserTheme(c, u)
 	ft, fm := app.flashFromQuery(c)
 	name := docID
+	kind := "pdf"
+	pages := 0
+	page := 0
+	backend := app.getBackend(c)
+	if tree, err := backend.GetDocumentTree(u.ID); err == nil && tree != nil {
+		d := findDocument(tree.Entries, docID)
+		if d == nil {
+			d = findDocument(tree.Trash, docID)
+		}
+		if d != nil {
+			name = d.Name
+			kind = normalizeDocType(d.DocumentType)
+			pages = d.PageCount
+			page = d.CurrentPage
+		}
+	}
+	if kind == "epub" {
+		app.pageEpub(c, u, css, chrome, ft, fm, docID, name, page, pages)
+		return
+	}
 	var b bytes.Buffer
-	writePageOpen(&b, "pdf", "Document — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
+	writePageOpen(&b, "pdf", name+" — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
 	fmt.Fprintf(&b, `<body><pdf doc-id="%s" name="%s" url="/ui/api/documents/%s?type=pdf"/></body>`,
 		xmlAttr(docID), xmlAttr(name), xmlAttr(docID))
+	writePageClose(&b)
+	app.renderPage(c, b.Bytes())
+}
+
+func (app *ReactAppWrapper) pageEpub(c *gin.Context, u *pageUser, css, chrome, ft, fm, docID, name string, page, pages int) {
+	type epubManifestBackend interface {
+		GetEpubManifest(uid, docid string) (*epub.Manifest, error)
+	}
+	var spine []string
+	backend := app.getBackend(c)
+	if eb, ok := backend.(epubManifestBackend); ok {
+		if man, err := eb.GetEpubManifest(u.ID, docID); err == nil && man != nil {
+			spine = man.Spine
+		}
+	}
+	if pages == 0 {
+		pages = len(spine)
+	}
+	start := models.ThumbPage1(page, pages)
+	if start < 1 {
+		start = 1
+	}
+	startPath := ""
+	if len(spine) > 0 {
+		idx := start - 1
+		if idx < 0 {
+			idx = 0
+		}
+		if idx >= len(spine) {
+			idx = len(spine) - 1
+		}
+		startPath = spine[idx]
+	}
+
+	startHref := ""
+	if startPath != "" {
+		startHref = epubAssetURL(docID, startPath)
+	}
+	var b bytes.Buffer
+	writePageOpen(&b, "epub", name+" — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
+	fmt.Fprintf(&b, `<body><epub doc-id="%s" name="%s" start="%s" start-href="%s" download-href="%s" page="%d" pages="%d">`,
+		xmlAttr(docID), xmlAttr(name), xmlAttr(startPath), xmlAttr(startHref),
+		xmlAttr("/ui/api/documents/"+docID+"?type=epub"), page, pages)
+	b.WriteString(`<spine>`)
+	for i, p := range spine {
+		label := epubSpineLabel(p, i)
+		fmt.Fprintf(&b, `<item path="%s" label="%s" href="%s"/>`, xmlAttr(p), xmlAttr(label), xmlAttr(epubAssetURL(docID, p)))
+	}
+	b.WriteString(`</spine></epub></body>`)
 	writePageClose(&b)
 	app.renderPage(c, b.Bytes())
 }

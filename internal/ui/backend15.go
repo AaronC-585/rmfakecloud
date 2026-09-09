@@ -5,6 +5,7 @@ import (
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
 	"github.com/ddvk/rmfakecloud/internal/storage"
+	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/google/uuid"
 )
@@ -25,6 +26,9 @@ func (b *backend15) GetDocumentTree(uid string) (tree *viewmodel.DocumentTree, e
 func (b *backend15) Export(uid, docid, exporttype string, opt storage.ExportOption) (r io.ReadCloser, err error) {
 	if exporttype == "rmdoc" {
 		return b.blobHandler.ExportRmDoc(uid, docid)
+	}
+	if exporttype == "epub" {
+		return b.blobHandler.GetEpub(uid, docid)
 	}
 	r, err = b.blobHandler.Export(uid, docid)
 	return
@@ -48,6 +52,22 @@ func (b *backend15) DeleteDocument(uid, docID string) (err error) {
 
 func (b *backend15) ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
 	return b.blobHandler.ExportPagePNG(uid, docid, pageNum)
+}
+
+func (b *backend15) GetEpubManifest(uid, docid string) (*epub.Manifest, error) {
+	return b.blobHandler.GetEpubManifest(uid, docid)
+}
+
+func (b *backend15) GetEpubFile(uid, docid, filePath string) (io.ReadCloser, string, error) {
+	return b.blobHandler.GetEpubFile(uid, docid, filePath)
+}
+
+func (b *backend15) GetEpubCoverThumb(uid, docid string) (io.ReadCloser, string, error) {
+	return b.blobHandler.GetEpubCoverThumb(uid, docid)
+}
+
+func (b *backend15) GetEpubPageThumb(uid, docid string, pageIndex0 int) (io.ReadCloser, string, error) {
+	return b.blobHandler.GetEpubPageThumb(uid, docid, pageIndex0)
 }
 
 func (b *backend15) Sync(uid string) {
