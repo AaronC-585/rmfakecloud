@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/ddvk/rmfakecloud/internal/integrations"
 	"github.com/ddvk/rmfakecloud/internal/model"
+	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -191,6 +193,27 @@ func (app *ReactAppWrapper) formUploadDocument(c *gin.Context) {
 		redirectFlash(c, documentsRedirect(parentID), "error", "No file uploaded")
 		return
 	}
+	ext := strings.ToLower(path.Ext(file.Filename))
+	if ext == storage.TemplateFileExt {
+		if !u.Admin {
+			redirectFlash(c, documentsRedirect(parentID), "error", "Only admins can upload templates")
+			return
+		}
+		f, err := file.Open()
+		if err != nil {
+			redirectFlash(c, "/admin/templates", "error", "Cannot open upload")
+			return
+		}
+		defer f.Close()
+		if _, err := backend.CreateDocument(u.ID, file.Filename, "", f); err != nil {
+			log.Error(err)
+			redirectFlash(c, "/admin/templates", "error", err.Error())
+			return
+		}
+		backend.Sync(u.ID)
+		redirectFlash(c, "/admin/templates", "success", "Template uploaded")
+		return
+	}
 	f, err := file.Open()
 	if err != nil {
 		redirectFlash(c, documentsRedirect(parentID), "error", "Cannot open upload")
@@ -233,12 +256,92 @@ func (app *ReactAppWrapper) formDeleteDocument(c *gin.Context) {
 	}
 	docid := c.Param("docid")
 	parentID := c.PostForm("parent")
+	if app.isSyncedTemplateDoc(c, u.ID, docid) {
+		if !u.Admin {
+			redirectFlash(c, documentsRedirect(parentID), "error", "Only admins can delete templates")
+			return
+		}
+		backend := app.getBackend(c)
+		if err := backend.DeleteDocument(u.ID, docid); err != nil {
+			redirectFlash(c, "/admin/templates", "error", err.Error())
+			return
+		}
+		backend.Sync(u.ID)
+		redirectFlash(c, "/admin/templates", "success", "Deleted")
+		return
+	}
 	backend := app.getBackend(c)
 	if err := backend.DeleteDocument(u.ID, docid); err != nil {
 		redirectFlash(c, documentsRedirect(parentID), "error", err.Error())
 		return
 	}
+	backend.Sync(u.ID)
 	redirectFlash(c, documentsRedirect(parentID), "success", "Deleted")
+}
+
+func (app *ReactAppWrapper) formUpdateDocument(c *gin.Context) {
+	u := app.requirePageUser(c)
+	if u == nil {
+		return
+	}
+	docid := c.Param("docid")
+	name := strings.TrimSpace(c.PostForm("name"))
+	parentID := c.PostForm("parent")
+	redirectParent := c.PostForm("redirect")
+	if redirectParent == "" {
+		redirectParent = parentID
+	}
+	if name == "" {
+		redirectFlash(c, documentsRedirect(redirectParent), "error", "Name required")
+		return
+	}
+	if app.isSyncedTemplateDoc(c, u.ID, docid) {
+		if !u.Admin {
+			redirectFlash(c, documentsRedirect(redirectParent), "error", "Only admins can rename templates")
+			return
+		}
+		backend := app.getBackend(c)
+		if err := backend.UpdateDocument(u.ID, docid, name, ""); err != nil {
+			redirectFlash(c, "/admin/templates", "error", err.Error())
+			return
+		}
+		backend.Sync(u.ID)
+		redirectFlash(c, "/admin/templates", "success", "Updated")
+		return
+	}
+	backend := app.getBackend(c)
+	if err := backend.UpdateDocument(u.ID, docid, name, parentID); err != nil {
+		redirectFlash(c, documentsRedirect(redirectParent), "error", err.Error())
+		return
+	}
+	backend.Sync(u.ID)
+	redirectFlash(c, documentsRedirect(redirectParent), "success", "Updated")
+}
+
+func (app *ReactAppWrapper) formPinDocument(c *gin.Context) {
+	u := app.requirePageUser(c)
+	if u == nil {
+		return
+	}
+	docid := c.Param("docid")
+	redirectParent := c.PostForm("redirect")
+	pinnedRaw := strings.ToLower(strings.TrimSpace(c.PostForm("pinned")))
+	pinned := pinnedRaw == "1" || pinnedRaw == "true" || pinnedRaw == "on" || pinnedRaw == "yes"
+	if app.isSyncedTemplateDoc(c, u.ID, docid) {
+		redirectFlash(c, documentsRedirect(redirectParent), "error", "Templates cannot be favorited here")
+		return
+	}
+	backend := app.getBackend(c)
+	if err := backend.SetDocumentPinned(u.ID, docid, pinned); err != nil {
+		redirectFlash(c, documentsRedirect(redirectParent), "error", err.Error())
+		return
+	}
+	backend.Sync(u.ID)
+	msg := "Removed from favorites"
+	if pinned {
+		msg = "Added to favorites"
+	}
+	redirectFlash(c, documentsRedirect(redirectParent), "success", msg)
 }
 
 func documentsRedirect(parentID string) string {

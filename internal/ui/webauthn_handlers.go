@@ -21,9 +21,9 @@ type webAuthnCeremonyResponse struct {
 }
 
 type webAuthnFinishRequest struct {
-	SessionID    string          `json:"sessionId"`
-	Credential   json.RawMessage `json:"credential"`
-	Name         string          `json:"name,omitempty"`
+	SessionID  string          `json:"sessionId"`
+	Credential json.RawMessage `json:"credential"`
+	Name       string          `json:"name,omitempty"`
 }
 
 type webAuthnCredentialView struct {

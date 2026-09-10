@@ -192,6 +192,8 @@
         <li><a href="/help">Help</a></li>
         <xsl:if test="$isAdmin">
           <li><a href="/admin/themes">Themes</a></li>
+          <li><a href="/admin/templates">Templates</a></li>
+          <li><a href="/admin/templates#rmethods">rMethods</a></li>
         </xsl:if>
         <li>
           <form class="inline-form" method="post" action="/logout">
@@ -222,7 +224,22 @@
   <!-- help -->
   <xsl:template match="help">
     <article class="panel help-panel">
-      <h1>Help</h1>
+      <header class="help-header">
+        <h1>Help</h1>
+        <p class="help-lead">Guides for this cloud. Everything below stays on this site.</p>
+      </header>
+      <nav class="help-toc" aria-label="Help topics">
+        <ol>
+          <xsl:for-each select="section">
+            <li>
+              <a>
+                <xsl:attribute name="href">#<xsl:value-of select="@id"/></xsl:attribute>
+                <xsl:value-of select="@title"/>
+              </a>
+            </li>
+          </xsl:for-each>
+        </ol>
+      </nav>
       <xsl:apply-templates select="section"/>
     </article>
   </xsl:template>
@@ -234,9 +251,28 @@
       <xsl:if test="intro">
         <p class="help-intro"><xsl:value-of select="intro"/></p>
       </xsl:if>
-      <ul class="help-links">
-        <xsl:apply-templates select="link"/>
-      </ul>
+      <xsl:for-each select="p">
+        <p class="help-body"><xsl:value-of select="."/></p>
+      </xsl:for-each>
+      <xsl:if test="steps/step">
+        <ol class="help-steps">
+          <xsl:for-each select="steps/step">
+            <li><xsl:value-of select="."/></li>
+          </xsl:for-each>
+        </ol>
+      </xsl:if>
+      <xsl:if test="bullets/item">
+        <ul class="help-bullets">
+          <xsl:for-each select="bullets/item">
+            <li><xsl:value-of select="."/></li>
+          </xsl:for-each>
+        </ul>
+      </xsl:if>
+      <xsl:if test="link">
+        <ul class="help-links">
+          <xsl:apply-templates select="link"/>
+        </ul>
+      </xsl:if>
     </section>
   </xsl:template>
 
@@ -244,10 +280,6 @@
     <li>
       <a>
         <xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-        <xsl:if test="@internal != 'true'">
-          <xsl:attribute name="rel">noopener noreferrer</xsl:attribute>
-          <xsl:attribute name="target">_blank</xsl:attribute>
-        </xsl:if>
         <xsl:value-of select="."/>
       </a>
       <xsl:if test="@note != ''">
@@ -347,7 +379,6 @@
             </xsl:choose>
           </div>
           <p id="connect-status" class="connect-status" role="status" aria-live="polite" hidden="hidden"/>
-
 
           <xsl:if test="$promptLoc = 'below'">
             <p>
@@ -510,10 +541,15 @@
         </div>
         <div class="rm-files-sort">
           <label for="rm-sort">Sort</label>
-          <select id="rm-sort">
-            <option value="modified" selected="selected">Last modified</option>
-            <option value="name">Name</option>
-          </select>
+          <div class="rm-files-sort-control">
+            <select id="rm-sort">
+              <option value="modified" selected="selected">Last modified</option>
+              <option value="name">Name</option>
+            </select>
+            <svg class="rm-files-sort-chevron" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M1.2 1.5 6 6.3l4.8-4.8L12 2.7 6 8.7 0 2.7z"/>
+            </svg>
+          </div>
         </div>
       </header>
 
@@ -525,9 +561,23 @@
       <section class="rm-folder-cluster" aria-label="Folders">
         <ul class="rm-folder-grid">
           <xsl:for-each select="folders/folder">
-            <li class="rm-folder-item" data-name="{@name}" data-modified="{@modified}">
+            <li class="rm-folder-item" data-id="{@id}" data-name="{@name}" data-modified="{@modified}" data-empty="{@empty}" data-pinned="{@pinned}">
+              <label class="rm-item-check">
+                <input type="checkbox" class="rm-select-box" value="{@id}" data-kind="folder" data-name="{@name}" data-pinned="{@pinned}" aria-label="Select {@name}"/>
+              </label>
               <a href="/documents?folder={@id}">
-                <span class="rm-folder-icon" aria-hidden="true"></span>
+                <xsl:choose>
+                  <xsl:when test="@empty = 'true'">
+                    <svg class="rm-folder-icon is-empty" viewBox="0 0 24 20" width="18" height="15" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" fill-rule="evenodd" d="M2 4h8l2 2h10v12H2V4zm1.5 1.5v11h17v-9H11.2l-2-2H3.5z"/>
+                    </svg>
+                  </xsl:when>
+                  <xsl:otherwise>
+                    <svg class="rm-folder-icon is-full" viewBox="0 0 24 20" width="18" height="15" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" d="M2 4h8l2 2h10v12H2z"/>
+                    </svg>
+                  </xsl:otherwise>
+                </xsl:choose>
                 <span class="rm-folder-name"><xsl:value-of select="@name"/></span>
                 <xsl:if test="@pinned = 'true'">
                   <span class="rm-star" aria-label="Favorite">★</span>
@@ -541,18 +591,24 @@
       <section class="rm-file-cluster" aria-label="Notebooks and documents">
         <ul class="rm-file-grid">
           <xsl:for-each select="files/doc">
-            <li class="rm-file-item" data-name="{@name}" data-modified="{@modified}" data-type="{@type}">
+            <li class="rm-file-item" data-id="{@id}" data-name="{@name}" data-modified="{@modified}" data-type="{@type}" data-pinned="{@pinned}">
+              <label class="rm-item-check">
+                <input type="checkbox" class="rm-select-box" value="{@id}" data-kind="file" data-name="{@name}" data-pinned="{@pinned}" aria-label="Select {@name}"/>
+              </label>
               <a href="/documents/{@id}" class="rm-file-link">
-                <span class="rm-page-frame is-{@type}">
+                <span class="rm-page-frame is-{@type} has-preview" data-label="{@label}">
                   <xsl:choose>
+                    <xsl:when test="(@type = 'pdf' or @type = 'epub') and @writings = 'true'">
+                      <img class="rm-thumb-img" src="/documents/{@id}/page/{@thumb-page}/thumb.png" alt="" decoding="async" width="180" height="240"/>
+                    </xsl:when>
                     <xsl:when test="@type = 'pdf'">
                       <canvas class="rm-thumb-canvas" width="180" height="240" data-pdf-url="/ui/api/documents/{@id}?type=pdf" data-pdf-page="{@thumb-page}" aria-hidden="true"></canvas>
                     </xsl:when>
                     <xsl:when test="@type = 'notebook'">
-                      <img class="rm-thumb-img" src="/ui/api/documents/{@id}/page/{@thumb-page}" alt="" loading="lazy" decoding="async" width="180" height="240"/>
+                      <img class="rm-thumb-img" src="/documents/{@id}/page/{@thumb-page}/thumb.png" alt="" decoding="async" width="180" height="240"/>
                     </xsl:when>
                     <xsl:when test="@type = 'epub'">
-                      <img class="rm-thumb-img" src="/ui/api/documents/{@id}/epub/thumb" alt="" loading="lazy" decoding="async" width="180" height="240"/>
+                      <img class="rm-thumb-img" src="/documents/{@id}/epub-thumb.png" alt="" decoding="async" width="180" height="240"/>
                     </xsl:when>
                     <xsl:otherwise>
                       <span class="rm-page-placeholder" aria-hidden="true"></span>
@@ -577,6 +633,7 @@
                         <xsl:text> of </xsl:text>
                         <xsl:value-of select="@pages"/>
                       </xsl:when>
+                      <xsl:when test="@label != ''"><xsl:value-of select="@label"/></xsl:when>
                       <xsl:when test="@type = 'pdf'">PDF</xsl:when>
                       <xsl:when test="@type = 'epub'">EPUB</xsl:when>
                       <xsl:otherwise>Notebook</xsl:otherwise>
@@ -592,15 +649,34 @@
         </xsl:if>
       </section>
 
+      <div id="rm-select-bar" class="rm-select-bar" hidden="hidden" role="toolbar" aria-label="Selection actions">
+        <span id="rm-select-count" class="rm-select-count">0 selected</span>
+        <button type="button" id="rm-select-all" class="btn btn-secondary btn-sm">Select all</button>
+        <button type="button" id="rm-rename-toggle" class="btn btn-secondary btn-sm" disabled="disabled">Rename</button>
+        <button type="button" id="rm-move-toggle" class="btn btn-secondary btn-sm" disabled="disabled">Move</button>
+        <button type="button" id="rm-favorite-toggle" class="btn btn-secondary btn-sm" disabled="disabled">★ Favorite</button>
+        <button type="button" id="rm-delete-selected" class="btn btn-danger btn-sm" disabled="disabled">Delete</button>
+      </div>
+
       <div class="rm-dock" role="toolbar" aria-label="File actions">
         <button type="button" id="rm-search-toggle" aria-label="Search" aria-expanded="false" aria-controls="rm-search-bar">
           <span class="rm-dock-icon rm-dock-search" aria-hidden="true"></span>
         </button>
-        <button type="button" id="rm-upload-toggle" aria-label="Upload document">
-          <span class="rm-dock-icon rm-dock-plus" aria-hidden="true"></span>
-        </button>
-        <button type="button" id="rm-folder-toggle" aria-label="New folder" aria-haspopup="dialog" aria-controls="rm-folder-dialog">
-          <span class="rm-dock-icon rm-dock-folder" aria-hidden="true"></span>
+        <div class="rm-dock-add">
+          <button type="button" id="rm-add-toggle" aria-label="Add" aria-haspopup="menu" aria-expanded="false" aria-controls="rm-add-menu">
+            <span class="rm-dock-icon rm-dock-plus" aria-hidden="true"></span>
+          </button>
+          <div id="rm-add-menu" class="rm-dock-add-menu" hidden="hidden" role="menu" aria-label="Add items">
+            <button type="button" role="menuitem" id="rm-folder-toggle" aria-label="Add folder" title="Add folder" aria-haspopup="dialog" aria-controls="rm-folder-dialog">
+              <span class="rm-dock-icon rm-dock-folder" aria-hidden="true"></span>
+            </button>
+            <button type="button" role="menuitem" id="rm-upload-toggle" aria-label="Upload" title="Upload">
+              <span class="rm-dock-icon rm-dock-upload" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+        <button type="button" id="rm-select-toggle" aria-label="Select items" aria-pressed="false" aria-controls="rm-select-bar">
+          <span class="rm-dock-icon rm-dock-select" aria-hidden="true"></span>
         </button>
       </div>
 
@@ -628,7 +704,205 @@
           </div>
         </form>
       </dialog>
+
+      <dialog id="rm-rename-dialog" class="rm-folder-dialog">
+        <form method="post" action="/documents/update" id="rm-rename-form">
+          <input type="hidden" name="parent" id="rm-rename-parent" value=""/>
+          <input type="hidden" name="redirect" id="rm-rename-redirect" value="{@folder-id}"/>
+          <h2>Rename</h2>
+          <div class="field">
+            <label for="rm-rename-name">Name</label>
+            <input id="rm-rename-name" type="text" name="name" required="required" maxlength="200"/>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="rm-rename-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="rm-move-dialog" class="rm-folder-dialog rm-move-dialog">
+        <form method="dialog" id="rm-move-form">
+          <h2>Move to</h2>
+          <div class="field">
+            <label for="rm-move-target">Folder</label>
+            <select id="rm-move-target" required="required">
+              <option value="">My Files</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="rm-move-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Move</button>
+          </div>
+        </form>
+      </dialog>
     </article>
+  </xsl:template>
+
+  <!-- admin templates -->
+  <xsl:template match="templates-admin">
+    <article class="panel templates-admin-panel rm-files">
+      <header class="rm-files-header templates-admin-header">
+        <div class="rm-files-title-row">
+          <h1>Templates</h1>
+        </div>
+        <p class="templates-admin-lead">
+          Manage synced templates and rMethods for this account. Tablets download them on sync.
+          Only admins can upload, download, rename, or delete.
+        </p>
+        <p><a class="btn btn-secondary btn-sm" href="/admin">Back to admin</a></p>
+      </header>
+
+      <section class="templates-upload" aria-labelledby="templates-upload-heading">
+        <h2 id="templates-upload-heading">Upload</h2>
+        <form method="post" action="/admin/templates/upload" enctype="multipart/form-data" class="templates-upload-form">
+          <div class="field">
+            <label for="template-file">Template file (.template or .rmdoc)</label>
+            <input id="template-file" type="file" name="file" accept=".template,.rmdoc,application/octet-stream" required="required"/>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="rm-file-cluster templates-synced" aria-labelledby="templates-synced-heading">
+        <h2 id="templates-synced-heading">Synced templates</h2>
+        <ul class="rm-file-grid">
+          <xsl:for-each select="templates/item">
+            <xsl:call-template name="template-file-card">
+              <xsl:with-param name="builtin" select="'false'"/>
+            </xsl:call-template>
+          </xsl:for-each>
+        </ul>
+        <xsl:if test="not(templates/item)">
+          <p class="rm-files-empty">No synced templates yet.</p>
+        </xsl:if>
+      </section>
+
+      <section id="rmethods" class="rm-file-cluster templates-methods" aria-labelledby="methods-synced-heading">
+        <h2 id="methods-synced-heading">Synced rMethods</h2>
+        <ul class="rm-file-grid">
+          <xsl:for-each select="methods/item">
+            <xsl:call-template name="template-file-card">
+              <xsl:with-param name="builtin" select="'false'"/>
+            </xsl:call-template>
+          </xsl:for-each>
+        </ul>
+        <xsl:if test="not(methods/item)">
+          <p class="rm-files-empty">No synced rMethods yet.</p>
+        </xsl:if>
+      </section>
+
+      <section class="rm-file-cluster templates-builtins" aria-labelledby="templates-builtins-heading">
+        <h2 id="templates-builtins-heading">Built-in templates</h2>
+        <p class="templates-admin-note">Read-only previews shipped with this server.</p>
+        <ul class="rm-file-grid">
+          <xsl:for-each select="builtin-templates/item">
+            <xsl:call-template name="template-file-card">
+              <xsl:with-param name="builtin" select="'true'"/>
+            </xsl:call-template>
+          </xsl:for-each>
+        </ul>
+      </section>
+
+      <section id="rmethods-builtins" class="rm-file-cluster templates-method-builtins" aria-labelledby="methods-builtins-heading">
+        <h2 id="methods-builtins-heading">Built-in rMethods</h2>
+        <p class="templates-admin-note">Read-only previews shipped with this server.</p>
+        <ul class="rm-file-grid">
+          <xsl:for-each select="builtin-methods/item">
+            <xsl:call-template name="template-file-card">
+              <xsl:with-param name="builtin" select="'true'"/>
+            </xsl:call-template>
+          </xsl:for-each>
+        </ul>
+      </section>
+
+      <div id="rm-select-bar" class="rm-select-bar" hidden="hidden" role="toolbar" aria-label="Selection actions">
+        <span id="rm-select-count" class="rm-select-count">0 selected</span>
+        <button type="button" id="rm-select-all" class="btn btn-secondary btn-sm">Select all</button>
+        <button type="button" id="rm-rename-toggle" class="btn btn-secondary btn-sm" disabled="disabled">Rename</button>
+        <button type="button" id="rm-delete-selected" class="btn btn-danger btn-sm" disabled="disabled">Delete</button>
+      </div>
+
+      <div class="rm-dock" role="toolbar" aria-label="Template actions">
+        <button type="button" id="rm-select-toggle" aria-label="Select items" aria-pressed="false" aria-controls="rm-select-bar">
+          <span class="rm-dock-icon rm-dock-select" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <dialog id="rm-rename-dialog" class="rm-folder-dialog">
+        <form method="post" action="/admin/templates/update" id="rm-rename-form">
+          <h2>Rename</h2>
+          <div class="field">
+            <label for="rm-rename-name">Name</label>
+            <input id="rm-rename-name" type="text" name="name" required="required" maxlength="200"/>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="rm-rename-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </dialog>
+    </article>
+  </xsl:template>
+
+  <xsl:template name="template-file-card">
+    <xsl:param name="builtin"/>
+    <li class="rm-file-item" data-id="{@id}" data-name="{@name}" data-type="{@kind}" data-modified="{@modified}" data-builtin="{$builtin}">
+      <xsl:if test="$builtin != 'true'">
+        <label class="rm-item-check">
+          <input type="checkbox" class="rm-select-box" value="{@id}" data-kind="file" data-name="{@name}" aria-label="Select {@name}"/>
+        </label>
+      </xsl:if>
+      <xsl:choose>
+        <xsl:when test="$builtin = 'true'">
+          <div class="rm-file-link">
+            <xsl:call-template name="template-file-preview"/>
+          </div>
+        </xsl:when>
+        <xsl:otherwise>
+          <a href="/admin/templates/{@id}/download" class="rm-file-link">
+            <xsl:call-template name="template-file-preview"/>
+          </a>
+        </xsl:otherwise>
+      </xsl:choose>
+    </li>
+  </xsl:template>
+
+  <xsl:template name="template-file-preview">
+    <xsl:variable name="label">
+      <xsl:choose>
+        <xsl:when test="@kind = 'method'">Method</xsl:when>
+        <xsl:otherwise>Template</xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+    <xsl:variable name="frameClass">
+      <xsl:choose>
+        <xsl:when test="@kind = 'method'">is-method</xsl:when>
+        <xsl:otherwise>is-template</xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+    <span class="rm-page-frame {$frameClass} has-preview" data-label="{$label}">
+      <xsl:choose>
+        <xsl:when test="@builtin = 'true'">
+          <img class="rm-thumb-img" src="/admin/templates/builtin/{@kind}/{@id}.svg" alt="" decoding="async" width="180" height="240"/>
+        </xsl:when>
+        <xsl:otherwise>
+          <img class="rm-thumb-img" src="/admin/templates/{@id}/thumb.svg" alt="" decoding="async" width="180" height="240"/>
+        </xsl:otherwise>
+      </xsl:choose>
+      <span class="rm-page-ear" aria-hidden="true"/>
+    </span>
+    <span class="rm-file-meta">
+      <span class="rm-file-name"><xsl:value-of select="@name"/></span>
+      <span class="rm-file-sub">
+        <xsl:choose>
+          <xsl:when test="@kind = 'method'">rMethod</xsl:when>
+          <xsl:otherwise>Template</xsl:otherwise>
+        </xsl:choose>
+      </span>
+    </span>
   </xsl:template>
 
   <xsl:template match="tree/folder|folder/folder">
@@ -740,7 +1014,11 @@
   <xsl:template match="admin">
     <article class="panel admin-panel">
       <h1>Admin</h1>
-      <p><a href="/admin/themes">Open Theme studio</a></p>
+      <nav class="admin-links" aria-label="Admin tools">
+        <a class="btn btn-secondary" href="/admin/themes">Theme studio</a>
+        <a class="btn btn-secondary" href="/admin/templates">Templates</a>
+        <a class="btn btn-secondary" href="/admin/templates#rmethods">rMethods</a>
+      </nav>
       <table class="data-table">
         <thead>
           <tr>
@@ -965,6 +1243,10 @@
             <xsl:attribute name="href"><xsl:value-of select="@url"/></xsl:attribute>
             Download PDF
           </a>
+          <xsl:if test="@encoding != ''">
+            <xsl:text> · </xsl:text>
+            <span class="doc-encoding"><xsl:value-of select="@encoding"/></span>
+          </xsl:if>
         </p>
       </header>
       <div
@@ -974,6 +1256,160 @@
         data-doc-url="{@url}"
       >
         <div id="pdf-canvas-container"></div>
+      </div>
+    </article>
+  </xsl:template>
+
+  <!-- notebook as paginated SVG (PDF only on download) -->
+  <xsl:template match="notebook">
+    <article class="panel notebook-panel">
+      <header class="nb-header">
+        <h1>
+          <xsl:choose>
+            <xsl:when test="@name != ''"><xsl:value-of select="@name"/></xsl:when>
+            <xsl:otherwise>Notebook</xsl:otherwise>
+          </xsl:choose>
+        </h1>
+        <p>
+          <a href="/documents">Back to documents</a>
+          <xsl:if test="@download-href != ''">
+            <xsl:text> · </xsl:text>
+            <a>
+              <xsl:attribute name="href"><xsl:value-of select="@download-href"/></xsl:attribute>
+              <xsl:attribute name="download"/>
+              Download PDF
+            </a>
+          </xsl:if>
+          <xsl:if test="@encoding != ''">
+            <xsl:text> · </xsl:text>
+            <span class="doc-encoding"><xsl:value-of select="@encoding"/></span>
+          </xsl:if>
+        </p>
+      </header>
+      <div
+        id="nb-viewer"
+        class="nb-viewer"
+        data-doc-id="{@doc-id}"
+        data-mode="svg"
+        data-page="{@page}"
+        data-pages="{@pages}"
+      >
+        <nav class="nb-pager" aria-label="Notebook pages">
+          <button type="button" id="nb-prev" class="btn btn-secondary btn-sm">
+            <xsl:if test="number(@page) &lt;= 1">
+              <xsl:attribute name="disabled">disabled</xsl:attribute>
+            </xsl:if>
+            Previous page
+          </button>
+          <p id="nb-page-status">
+            <xsl:text>Page </xsl:text>
+            <xsl:value-of select="@page"/>
+            <xsl:text> of </xsl:text>
+            <xsl:value-of select="@pages"/>
+          </p>
+          <button type="button" id="nb-next" class="btn btn-secondary btn-sm">
+            <xsl:if test="number(@page) &gt;= number(@pages)">
+              <xsl:attribute name="disabled">disabled</xsl:attribute>
+            </xsl:if>
+            Next page
+          </button>
+        </nav>
+        <figure class="nb-stage">
+          <img
+            id="nb-page"
+            class="nb-page-img"
+            width="1404"
+            height="1872"
+            decoding="async"
+          >
+            <xsl:attribute name="src"><xsl:value-of select="@svg-href"/></xsl:attribute>
+            <xsl:attribute name="alt">
+              <xsl:text>Page </xsl:text>
+              <xsl:value-of select="@page"/>
+              <xsl:text> of </xsl:text>
+              <xsl:value-of select="@pages"/>
+            </xsl:attribute>
+          </img>
+        </figure>
+      </div>
+    </article>
+  </xsl:template>
+
+  <!-- annotated PDF/EPUB: PNG composite (background × .rm ink) -->
+  <xsl:template match="annotated">
+    <article class="panel notebook-panel annotated-panel">
+      <header class="nb-header">
+        <h1>
+          <xsl:choose>
+            <xsl:when test="@name != ''"><xsl:value-of select="@name"/></xsl:when>
+            <xsl:when test="@kind = 'epub'">EPUB</xsl:when>
+            <xsl:otherwise>PDF</xsl:otherwise>
+          </xsl:choose>
+        </h1>
+        <p>
+          <a href="/documents">Back to documents</a>
+          <xsl:if test="@download-href != ''">
+            <xsl:text> · </xsl:text>
+            <a>
+              <xsl:attribute name="href"><xsl:value-of select="@download-href"/></xsl:attribute>
+              <xsl:attribute name="download"/>
+              <xsl:choose>
+                <xsl:when test="@download-label != ''"><xsl:value-of select="@download-label"/></xsl:when>
+                <xsl:otherwise>Download</xsl:otherwise>
+              </xsl:choose>
+            </a>
+          </xsl:if>
+          <xsl:if test="@encoding != ''">
+            <xsl:text> · </xsl:text>
+            <span class="doc-encoding"><xsl:value-of select="@encoding"/></span>
+          </xsl:if>
+        </p>
+      </header>
+      <div
+        id="nb-viewer"
+        class="nb-viewer"
+        data-doc-id="{@doc-id}"
+        data-mode="png"
+        data-page="{@page}"
+        data-pages="{@pages}"
+      >
+        <nav class="nb-pager" aria-label="Document pages">
+          <button type="button" id="nb-prev" class="btn btn-secondary btn-sm">
+            <xsl:if test="number(@page) &lt;= 1">
+              <xsl:attribute name="disabled">disabled</xsl:attribute>
+            </xsl:if>
+            Previous page
+          </button>
+          <p id="nb-page-status">
+            <xsl:text>Page </xsl:text>
+            <xsl:value-of select="@page"/>
+            <xsl:text> of </xsl:text>
+            <xsl:value-of select="@pages"/>
+          </p>
+          <button type="button" id="nb-next" class="btn btn-secondary btn-sm">
+            <xsl:if test="number(@page) &gt;= number(@pages)">
+              <xsl:attribute name="disabled">disabled</xsl:attribute>
+            </xsl:if>
+            Next page
+          </button>
+        </nav>
+        <figure class="nb-stage">
+          <img
+            id="nb-page"
+            class="nb-page-img"
+            width="1404"
+            height="1872"
+            decoding="async"
+          >
+            <xsl:attribute name="src"><xsl:value-of select="@png-href"/></xsl:attribute>
+            <xsl:attribute name="alt">
+              <xsl:text>Page </xsl:text>
+              <xsl:value-of select="@page"/>
+              <xsl:text> of </xsl:text>
+              <xsl:value-of select="@pages"/>
+            </xsl:attribute>
+          </img>
+        </figure>
       </div>
     </article>
   </xsl:template>
@@ -1115,11 +1551,14 @@
       <xsl:when test="$kind = 'pdf'">
         <script src="/assets/js/pdfview.js" defer="defer"></script>
       </xsl:when>
-      <xsl:when test="$kind = 'epub'">
-        <script src="/assets/js/epubview.js" defer="defer"></script>
-      </xsl:when>
       <xsl:when test="$kind = 'admin'">
         <script src="/assets/js/admin-logs.js" defer="defer"></script>
+      </xsl:when>
+      <xsl:when test="$kind = 'notebook' or $kind = 'annotated'">
+        <script src="/assets/js/nbview.js" defer="defer"></script>
+      </xsl:when>
+      <xsl:when test="$kind = 'epub'">
+        <script src="/assets/js/epubview.js" defer="defer"></script>
       </xsl:when>
       <xsl:when test="$kind = 'themes'">
         <script src="/assets/js/theme-studio.js" defer="defer"></script>

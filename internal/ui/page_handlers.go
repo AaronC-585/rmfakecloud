@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/applog"
+	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/model"
 	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
+	uimethods "github.com/ddvk/rmfakecloud/internal/ui/methods"
+	uitemplates "github.com/ddvk/rmfakecloud/internal/ui/templates"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -52,47 +56,211 @@ func (app *ReactAppWrapper) pageHelp(c *gin.Context) {
 }
 
 func writeHelpSections(b *bytes.Buffer) {
-	type link struct {
-		href, label, note string
-		internal          bool
-	}
+	type nav struct{ href, label, note string }
 	type section struct {
 		id, title, intro string
-		links            []link
+		paras            []string
+		steps            []string
+		bullets          []string
+		nav              []nav
 	}
-	docs := "https://ddvk.github.io/rmfakecloud"
-	hc := "https://support.remarkable.com/hc/en-us"
 	sections := []section{
-		{id: "this-instance", title: "This cloud (quick start)", intro: "Day-to-day pages on this instance.", links: []link{
-			{"/connect", "Connect / pair a tablet", "One-time code for Account → Connect", true},
-			{"/documents", "Documents", "Browse, upload, download", true},
-			{"/integrations", "Integrations", "WebDAV, FTP, local folders", true},
-			{"/screenshare", "Screen share", "Live view when MQTT/WebRTC is configured", true},
-			{"/profile", "Profile", "Password, passkeys, deploy a theme", true},
-		}},
-		{id: "official", title: "Official reMarkable help", intro: "From reMarkable Support.", links: []link{
-			{"https://support.remarkable.com/s/", "reMarkable Support home", "Search official articles", false},
-			{hc + "/categories/360000160977-Getting-Started", "Getting started", "Setup and first steps", false},
-			{hc + "/categories/360000161018-My-reMarkable", "My reMarkable", "Device settings and care", false},
-			{hc + "/categories/360000160997-Software", "Software", "Updates and apps", false},
-		}},
-		{id: "rmfakecloud", title: "rmfakecloud documentation", intro: "Project docs for self-hosted sync.", links: []link{
-			{docs + "/", "Documentation home", "Overview", false},
-			{docs + "/remarkable/setup/", "Tablet setup", "Proxy, hosts, pairing", false},
-			{docs + "/install/configuration/", "Server configuration", "Environment variables", false},
-			{docs + "/usage/integrations/", "Integrations usage", "WebDAV, FTP, webhooks", false},
-			{"https://github.com/ddvk/rmfakecloud", "GitHub repository", "Source and issues", false},
-		}},
+		{
+			id:    "overview",
+			title: "What this cloud is",
+			intro: "rmfakecloud is a self-hosted stand-in for reMarkable’s cloud. Your tablet syncs notebooks, PDFs, and EPUBs here instead of remarkable.com.",
+			paras: []string{
+				"This website lets you browse My Files, open documents in the browser, upload and download files, pair a tablet, manage integrations, and (if enabled) share the tablet screen live.",
+				"Supported tablets include reMarkable 1, 2, Paper Pro, Paper Pro Move, and Paper Pure. Sync works with tablet software through about 3.27.x; newer tablet builds may still work but are not guaranteed.",
+			},
+			nav: []nav{
+				{"/connect", "Connect", "Pair a tablet with a one-time code"},
+				{"/documents", "My Files", "Browse and open documents"},
+				{"/profile", "Profile", "Password, passkeys, theme"},
+			},
+		},
+		{
+			id:    "connect",
+			title: "Connect a tablet",
+			intro: "Pairing uses a short code from this site, entered on the tablet under Account → Connect.",
+			steps: []string{
+				"Open Connect in the navigation (or go to the Connect page).",
+				"Wait for a one-time code to appear. It refreshes on a timer; use a fresh code if it expires.",
+				"On the tablet: open the menu → Account (or Settings → Account) → Connect / pair with cloud.",
+				"Enter the code exactly as shown. The tablet should show that it is connected to your cloud.",
+				"After pairing, leave the tablet on Wi‑Fi so it can finish the first full sync. The Connect page detects a successful pair and issues a fresh code automatically.",
+			},
+			paras: []string{
+				"If pairing fails, confirm the tablet can reach this server (same Wi‑Fi or VPN as needed), that the code has not expired, and that registration/pairing is allowed on this instance. After an official tablet software update, the on-device proxy or hosts changes may be wiped—reinstall the tablet-side proxy, then reconnect.",
+			},
+			nav: []nav{{"/connect", "Open Connect", "Generate a pairing code"}},
+		},
+		{
+			id:    "my-files",
+			title: "My Files",
+			intro: "My Files is the browser file browser for everything synced to this cloud.",
+			bullets: []string{
+				"Folders appear first; documents are shown as framed page cards (notebook paper, PDF, or EPUB cover).",
+				"Corner badges show format and encoding when known (for example RM v6, PDF 1.7, or PDF 1.7 · v6 when a PDF has ink overlays).",
+				"Subtitles show page progress (Page N of M) when page counts are available.",
+				"Use Search, +, and Select from the dock at the bottom of My Files. The + menu offers Add folder and Upload.",
+				"Select mode lets you rename one item, move or delete one or many, and toggle favorites (★).",
+				"Favorites (stars) sort ahead of other items in the same folder.",
+			},
+			paras: []string{
+				"Opening a document uses the in-browser viewer for that type. Downloading a PDF or EPUB uses the Download link on the viewer (or export from the API). Notebooks are shown as vector pages in the browser; PDF export of a notebook is only via Download PDF, not as the on-screen viewer.",
+			},
+			nav: []nav{{"/documents", "Open My Files", "Browse folders and documents"}},
+		},
+		{
+			id:    "notebooks",
+			title: "Notebooks",
+			intro: "Notebooks are reMarkable handwritten documents (lines / .rm pages).",
+			paras: []string{
+				"In the browser, notebooks open as a paginated page viewer. The first page shown is the last-opened page from the tablet when that metadata is present; otherwise page 1. Use Previous / Next or the arrow keys to move between pages.",
+				"Display uses SVG (or a high-fidelity ink renderer when available). It does not convert the notebook to PDF just to show it. Use Download PDF only when you want a PDF file.",
+				"Encoding badges: RM v3 / v5 / v6 refer to the lines file version on the tablet. Older notebooks are often v3 or v5; current tablet software typically writes v6.",
+				"If a page cannot be decoded (missing data or tooling unavailable), you may see ruled-paper placeholder art instead of ink. Sync the tablet again or ask an admin to check rendering tools on the server.",
+			},
+			bullets: []string{
+				"Keyboard: ← / → or Page Up / Page Down to change page; Home / End for first / last.",
+				"Thumbnails in My Files use the last-opened page when possible.",
+			},
+		},
+		{
+			id:    "templates",
+			title: "Templates",
+			intro: "Templates are page backgrounds and structured layouts you apply on the tablet when creating or editing notebook pages.",
+			paras: []string{
+				"On the tablet, choose a template (blank, lined, grid, dotted, and others) when you add a page or change the page template. The ink you write sits on top of that background. Synced notebooks keep which template each page used; this cloud shows the handwriting in the notebook viewer and may show a simple ruled placeholder when the exact template art is not available.",
+				"reMarkable Methods (sometimes labeled rm Methods on the device) are structured note layouts—for example Cornell notes, outline, mind map, flowchart, or checklist. They sync like other library items and are separate from ordinary notebooks and PDFs.",
+				"Admins manage the synced template library from Templates in the web UI: upload .template / .rmdoc files, rename, download, or delete. Tablets pick up changes on the next sync. Non-admins cannot change templates from My Files.",
+			},
+			bullets: []string{
+				"Built-in style templates: blank, lined, grid, dotted, and device-specific variants (previewed on the admin Templates page).",
+				"Methods: structured layouts (Cornell, outline, mind map, and similar) for organized note-taking.",
+				"Changing a page’s template on the tablet updates after the next sync; older pages keep the template they had when written.",
+				"If a page looks blank or only ruled paper in the browser, the ink layer may still be syncing or the server may not have that template’s artwork—resync and open again.",
+			},
+			nav: []nav{{"/admin/templates", "Templates", "Admin template library"}},
+		},
+		{
+			id:    "pdfs-epubs",
+			title: "PDFs and EPUBs",
+			intro: "PDFs and EPUBs sync like notebooks and open in dedicated viewers.",
+			bullets: []string{
+				"PDF: opens in the PDF viewer. Download PDF saves the file. Annotated PDFs may show a badge like PDF 1.7 · v6 when ink overlays exist.",
+				"EPUB: opens as an unpacked website (HTML/CSS) in an iframe with a contents list when available. Download EPUB saves the original file.",
+				"EPUB covers and page thumbs in My Files come from the book’s cover image or a placeholder if none is found.",
+			},
+		},
+		{
+			id:    "upload-download",
+			title: "Upload and download",
+			intro: "You can add files from the browser and export synced documents.",
+			steps: []string{
+				"In My Files, open the dock + menu → Upload and choose a PDF, EPUB, or supported document.",
+				"Optional: set the parent folder so the file lands in the folder you are viewing.",
+				"After upload, wait for sync; the tablet picks up new files on the next sync.",
+				"To export: open the document and use Download PDF / Download EPUB, or use the documents API export for advanced clients.",
+			},
+			paras: []string{
+				"Deleting a document in the web UI removes it from this cloud; the tablet will remove it on the next sync. Do not manually delete files from the server data directory unless you understand that the tablet will treat them as deleted.",
+			},
+		},
+		{
+			id:    "integrations",
+			title: "Integrations",
+			intro: "Integrations pull files from external storage into the tablet’s Integrations area.",
+			bullets: []string{
+				"WebDAV (Nextcloud, ownCloud, and similar)",
+				"FTP",
+				"Local folders on the server (when configured)",
+				"Messaging webhooks and calendar (ICS) when enabled by the administrator",
+			},
+			paras: []string{
+				"Create and remove integrations from the Integrations page. Paths and credentials depend on how your admin configured the server. Dropbox and Google Drive may appear experimental depending on this build.",
+			},
+			nav: []nav{{"/integrations", "Integrations", "Add or remove storage backends"}},
+		},
+		{
+			id:    "screenshare",
+			title: "Screen share",
+			intro: "Live screen share shows the tablet display in the browser when MQTT/WebRTC is configured on this instance.",
+			paras: []string{
+				"Open Screen share from the navigation while the tablet is sharing. If the page stays empty, sharing may be off on the tablet, or this server may not have screen-share services enabled.",
+			},
+			nav: []nav{{"/screenshare", "Screen share", "Live tablet view"}},
+		},
+		{
+			id:    "profile",
+			title: "Profile, themes, and passkeys",
+			intro: "Your profile controls sign-in and how the website looks.",
+			bullets: []string{
+				"Change password from Profile.",
+				"Passkeys (when enabled): register a device authenticator while logged in; then you can sign in without typing a password.",
+				"Themes: pick a shell style (for example reMarkable, Google Docs–like, iCloud–like, or desktop OS) and deploy a theme if you have permission.",
+			},
+			nav: []nav{{"/profile", "Profile", "Password, passkeys, theme"}},
+		},
+		{
+			id:    "admin",
+			title: "Administration",
+			intro: "Administrators manage users, themes, and the synced template library.",
+			bullets: []string{
+				"Create and delete users from Admin.",
+				"Theme Studio edits shared themes and chrome layouts.",
+				"Templates: upload, rename, download, or delete synced templates and methods; preview built-in SVGs.",
+				"Server logs on the Admin page show recent in-memory log lines from this process (Refresh or wait for auto-update).",
+				"Server environment (data directory, TLS, SMTP, registration open/closed, rendering tools) is configured on the host—not from this Help page.",
+			},
+			nav: []nav{
+				{"/admin", "Admin", "Users (admins only)"},
+				{"/admin/templates", "Templates", "Template library (admins only)"},
+			},
+		},
+		{
+			id:    "troubleshooting",
+			title: "Troubleshooting",
+			intro: "Common fixes without leaving this cloud.",
+			bullets: []string{
+				"Cannot pair: get a new code on Connect; confirm tablet Wi‑Fi; after a tablet OS update, reinstall the on-device proxy and try again.",
+				"Documents missing: wait for sync; check that you are in the correct folder; look in Trash if your tablet moved items there.",
+				"Notebook pages blank or ruled paper only: the page may still be syncing, or v6 rendering tools may be unavailable on the server—resync and retry.",
+				"Login fails: reset password via an admin if needed; try a registered passkey if you use one.",
+				"Upload too large: this instance may enforce a maximum upload size set by the administrator.",
+			},
+			paras: []string{
+				"If the whole site is unreachable, the problem is network or the server process—not something you can fix from Help. Contact whoever hosts this instance.",
+			},
+		},
 	}
+
 	for _, s := range sections {
-		fmt.Fprintf(b, `<section id="%s" title="%s"><intro>%s</intro>`, xmlAttr(s.id), xmlAttr(s.title), esc(s.intro))
-		for _, l := range s.links {
-			internal := "false"
-			if l.internal {
-				internal = "true"
+		fmt.Fprintf(b, `<section id="%s" title="%s">`, xmlAttr(s.id), xmlAttr(s.title))
+		if s.intro != "" {
+			fmt.Fprintf(b, `<intro>%s</intro>`, esc(s.intro))
+		}
+		for _, p := range s.paras {
+			fmt.Fprintf(b, `<p>%s</p>`, esc(p))
+		}
+		if len(s.steps) > 0 {
+			b.WriteString(`<steps>`)
+			for _, st := range s.steps {
+				fmt.Fprintf(b, `<step>%s</step>`, esc(st))
 			}
-			fmt.Fprintf(b, `<link href="%s" internal="%s" note="%s">%s</link>`,
-				xmlAttr(l.href), internal, xmlAttr(l.note), esc(l.label))
+			b.WriteString(`</steps>`)
+		}
+		if len(s.bullets) > 0 {
+			b.WriteString(`<bullets>`)
+			for _, bu := range s.bullets {
+				fmt.Fprintf(b, `<item>%s</item>`, esc(bu))
+			}
+			b.WriteString(`</bullets>`)
+		}
+		for _, n := range s.nav {
+			fmt.Fprintf(b, `<link href="%s" internal="true" note="%s">%s</link>`,
+				xmlAttr(n.href), xmlAttr(n.note), esc(n.label))
 		}
 		b.WriteString(`</section>`)
 	}
@@ -273,8 +441,12 @@ func (app *ReactAppWrapper) pageDocuments(c *gin.Context) {
 		if d.Pinned {
 			pin = "true"
 		}
-		fmt.Fprintf(&b, `<folder id="%s" name="%s" pinned="%s" modified="%s"/>`,
-			xmlAttr(d.ID), xmlAttr(d.Name), pin, xmlAttr(d.LastModified.Format(time.RFC3339)))
+		empty := "true"
+		if len(d.Entries) > 0 {
+			empty = "false"
+		}
+		fmt.Fprintf(&b, `<folder id="%s" name="%s" pinned="%s" empty="%s" modified="%s"/>`,
+			xmlAttr(d.ID), xmlAttr(d.Name), pin, empty, xmlAttr(d.LastModified.Format(time.RFC3339)))
 	}
 	b.WriteString(`</folders><files>`)
 	for _, d := range files {
@@ -282,13 +454,110 @@ func (app *ReactAppWrapper) pageDocuments(c *gin.Context) {
 		if d.Pinned {
 			pin = "true"
 		}
-		fmt.Fprintf(&b, `<doc id="%s" name="%s" type="%s" pages="%d" page="%d" thumb-page="%d" pinned="%s" modified="%s"/>`,
-			xmlAttr(d.ID), xmlAttr(d.Name), xmlAttr(normalizeDocType(d.DocumentType)),
+		kind := normalizeDocType(d.DocumentType)
+		fmt.Fprintf(&b, `<doc id="%s" name="%s" type="%s" label="%s" writings="%s" pages="%d" page="%d" thumb-page="%d" pinned="%s" modified="%s"/>`,
+			xmlAttr(d.ID), xmlAttr(d.Name), xmlAttr(kind), xmlAttr(docFormatLabel(d.FormatLabel, kind)),
+			writingsAttr(d.HasWritings),
 			d.PageCount, d.CurrentPage, models.ThumbPage1(d.CurrentPage, d.PageCount), pin, xmlAttr(d.LastModified.Format(time.RFC3339)))
 	}
 	b.WriteString(`</files></documents></body>`)
 	writePageClose(&b)
 	app.renderPage(c, b.Bytes())
+}
+
+func (app *ReactAppWrapper) pageNotebookThumb(c *gin.Context) {
+	u := app.requireThumbUser(c)
+	if u == nil {
+		return
+	}
+	app.serveNotebookThumb(c, u.ID, common.ParamS("docid", c))
+}
+
+func (app *ReactAppWrapper) pageNotebookPageSVG(c *gin.Context) {
+	u := app.requireThumbUser(c)
+	if u == nil {
+		return
+	}
+	pagenum, err := strconv.Atoi(c.Param("pagenum"))
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	app.serveNotebookSVG(c, u.ID, common.ParamS("docid", c), pagenum)
+}
+
+func (app *ReactAppWrapper) pageAnnotatedPageThumb(c *gin.Context) {
+	u := app.requireThumbUser(c)
+	if u == nil {
+		return
+	}
+	pagenum, err := strconv.Atoi(c.Param("pagenum"))
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	app.serveAnnotatedPageThumb(c, u.ID, common.ParamS("docid", c), pagenum)
+}
+
+func (app *ReactAppWrapper) pageNotebook(c *gin.Context, u *pageUser, css, chrome, ft, fm, docID, name string, opened0, pages int, encoding string) {
+	if bh := app.blobStorage(); bh != nil {
+		if n := bh.NotebookPageCount(u.ID, docID); n > pages {
+			pages = n
+		}
+	}
+	if pages < 1 {
+		pages = 1
+	}
+	start := models.ThumbPage1(opened0, pages)
+	if q := strings.TrimSpace(c.Query("page")); q != "" {
+		if n, err := strconv.Atoi(q); err == nil {
+			start = n
+		}
+	}
+	if start < 1 {
+		start = 1
+	}
+	if start > pages {
+		start = pages
+	}
+	svgHref := fmt.Sprintf("/documents/%s/page/%d/svg", docID, start)
+	pdfHref := "/ui/api/documents/" + docID + "?type=pdf"
+	var b bytes.Buffer
+	writePageOpen(&b, "notebook", name+" — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
+	fmt.Fprintf(&b, `<body><notebook doc-id="%s" name="%s" encoding="%s" page="%d" pages="%d" svg-href="%s" download-href="%s"/></body>`,
+		xmlAttr(docID), xmlAttr(name), xmlAttr(docFormatLabel(encoding, "notebook")), start, pages, xmlAttr(svgHref), xmlAttr(pdfHref))
+	writePageClose(&b)
+	app.renderPage(c, b.Bytes())
+}
+
+func (app *ReactAppWrapper) pageEpubThumb(c *gin.Context) {
+	u := app.requireThumbUser(c)
+	if u == nil {
+		return
+	}
+	app.serveEpubThumb(c, u.ID, common.ParamS("docid", c))
+}
+
+func docFormatLabel(label, kind string) string {
+	label = strings.TrimSpace(label)
+	if label != "" {
+		return label
+	}
+	switch normalizeDocType(kind) {
+	case "pdf":
+		return "PDF"
+	case "epub":
+		return "EPUB"
+	default:
+		return "RM"
+	}
+}
+
+func writingsAttr(has bool) string {
+	if has {
+		return "true"
+	}
+	return "false"
 }
 
 func normalizeDocType(t string) string {
@@ -399,6 +668,8 @@ func (app *ReactAppWrapper) pagePDF(c *gin.Context) {
 	kind := "pdf"
 	pages := 0
 	page := 0
+	encoding := ""
+	hasWritings := false
 	backend := app.getBackend(c)
 	if tree, err := backend.GetDocumentTree(u.ID); err == nil && tree != nil {
 		d := findDocument(tree.Entries, docID)
@@ -410,16 +681,64 @@ func (app *ReactAppWrapper) pagePDF(c *gin.Context) {
 			kind = normalizeDocType(d.DocumentType)
 			pages = d.PageCount
 			page = d.CurrentPage
+			encoding = d.FormatLabel
+			hasWritings = d.HasWritings
 		}
 	}
+	encoding = docFormatLabel(encoding, kind)
 	if kind == "epub" {
+		if hasWritings {
+			app.pageAnnotated(c, u, css, chrome, ft, fm, docID, name, page, pages, encoding, "epub")
+			return
+		}
 		app.pageEpub(c, u, css, chrome, ft, fm, docID, name, page, pages)
+		return
+	}
+	if kind == "notebook" {
+		app.pageNotebook(c, u, css, chrome, ft, fm, docID, name, page, pages, encoding)
+		return
+	}
+	if hasWritings {
+		app.pageAnnotated(c, u, css, chrome, ft, fm, docID, name, page, pages, encoding, "pdf")
 		return
 	}
 	var b bytes.Buffer
 	writePageOpen(&b, "pdf", name+" — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
-	fmt.Fprintf(&b, `<body><pdf doc-id="%s" name="%s" url="/ui/api/documents/%s?type=pdf"/></body>`,
-		xmlAttr(docID), xmlAttr(name), xmlAttr(docID))
+	fmt.Fprintf(&b, `<body><pdf doc-id="%s" name="%s" encoding="%s" url="/ui/api/documents/%s?type=pdf"/></body>`,
+		xmlAttr(docID), xmlAttr(name), xmlAttr(encoding), xmlAttr(docID))
+	writePageClose(&b)
+	app.renderPage(c, b.Bytes())
+}
+
+// pageAnnotated shows PDF/EPUB pages as PNG composites (payload/cover × .rm ink).
+func (app *ReactAppWrapper) pageAnnotated(c *gin.Context, u *pageUser, css, chrome, ft, fm, docID, name string, opened0, pages int, encoding, kind string) {
+	if pages < 1 {
+		pages = 1
+	}
+	start := models.ThumbPage1(opened0, pages)
+	if q := strings.TrimSpace(c.Query("page")); q != "" {
+		if n, err := strconv.Atoi(q); err == nil {
+			start = n
+		}
+	}
+	if start < 1 {
+		start = 1
+	}
+	if start > pages {
+		start = pages
+	}
+	pngHref := fmt.Sprintf("/ui/api/documents/%s/page/%d", docID, start)
+	dlType := "pdf"
+	dlLabel := "Download PDF"
+	if kind == "epub" {
+		dlType = "epub"
+		dlLabel = "Download EPUB"
+	}
+	dlHref := "/ui/api/documents/" + docID + "?type=" + dlType
+	var b bytes.Buffer
+	writePageOpen(&b, "annotated", name+" — rmfakecloud", "/documents/"+docID, chrome, css, u, ft, fm, defaultNav("/documents", u.Admin))
+	fmt.Fprintf(&b, `<body><annotated doc-id="%s" name="%s" encoding="%s" kind="%s" page="%d" pages="%d" png-href="%s" download-href="%s" download-label="%s"/></body>`,
+		xmlAttr(docID), xmlAttr(name), xmlAttr(encoding), xmlAttr(kind), start, pages, xmlAttr(pngHref), xmlAttr(dlHref), xmlAttr(dlLabel))
 	writePageClose(&b)
 	app.renderPage(c, b.Bytes())
 }
@@ -529,6 +848,61 @@ func (app *ReactAppWrapper) pageAdmin(c *gin.Context) {
 	b.WriteString(`</logs></admin></body>`)
 	writePageClose(&b)
 	app.renderPage(c, b.Bytes())
+}
+
+func (app *ReactAppWrapper) pageTemplates(c *gin.Context) {
+	u := app.requirePageUser(c)
+	if u == nil {
+		return
+	}
+	if !u.Admin {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	_, css, chrome, _ := app.loadUserTheme(c, u)
+	ft, fm := app.flashFromQuery(c)
+	backend := app.getBackend(c)
+	tree, err := backend.GetDocumentTree(u.ID)
+	if err != nil {
+		log.Error(err)
+		redirectFlash(c, "/admin", "error", "Unable to load templates")
+		return
+	}
+
+	var b bytes.Buffer
+	writePageOpen(&b, "templates", "Templates — rmfakecloud", "/admin/templates", chrome, css, u, ft, fm, defaultNav("/admin/templates", u.Admin))
+	b.WriteString(`<body><templates-admin>`)
+	b.WriteString(`<templates>`)
+	writeTemplateAdminItems(&b, tree.Templates, "template")
+	b.WriteString(`</templates>`)
+	b.WriteString(`<methods>`)
+	writeTemplateAdminItems(&b, tree.Methods, "method")
+	b.WriteString(`</methods>`)
+	b.WriteString(`<builtin-templates>`)
+	for _, t := range uitemplates.ListBuiltins() {
+		fmt.Fprintf(&b, `<item id="%s" name="%s" kind="template" builtin="true"/>`,
+			xmlAttr(t.ID), xmlAttr(t.Name))
+	}
+	b.WriteString(`</builtin-templates>`)
+	b.WriteString(`<builtin-methods>`)
+	for _, m := range uimethods.ListBuiltins() {
+		fmt.Fprintf(&b, `<item id="%s" name="%s" kind="method" builtin="true"/>`,
+			xmlAttr(m.ID), xmlAttr(m.Name))
+	}
+	b.WriteString(`</builtin-methods></templates-admin></body>`)
+	writePageClose(&b)
+	app.renderPage(c, b.Bytes())
+}
+
+func writeTemplateAdminItems(b *bytes.Buffer, entries []viewmodel.Entry, kind string) {
+	for _, e := range entries {
+		d, ok := e.(*viewmodel.Document)
+		if !ok || d == nil {
+			continue
+		}
+		fmt.Fprintf(b, `<item id="%s" name="%s" kind="%s" builtin="false" modified="%s"/>`,
+			xmlAttr(d.ID), xmlAttr(d.Name), xmlAttr(kind), xmlAttr(d.LastModified.Format(time.RFC3339)))
+	}
 }
 
 func (app *ReactAppWrapper) pageThemeStudio(c *gin.Context) {

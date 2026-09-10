@@ -16,6 +16,7 @@
     integrations="puzzle"
     connect="link"
     screenshare="display"
+    templates="file"
     admin="gear"
     profile="person"
   />
@@ -33,6 +34,7 @@
       <item id="integrations" visible="true"/>
       <item id="connect" visible="true"/>
       <item id="screenshare" visible="true"/>
+      <item id="templates" visible="true" admin-only="true"/>
       <item id="admin" visible="true" admin-only="true"/>
       <item id="help" visible="true"/>
       <item id="profile" visible="true"/>
@@ -61,11 +63,12 @@
         drawer-color="#000000"
         label-color="#ffffff"
       />
-      <nav brand-position="start" user-menu="end">
+        <nav brand-position="start" user-menu="end">
         <item id="documents" visible="true"/>
         <item id="integrations" visible="true"/>
         <item id="connect" visible="true"/>
         <item id="screenshare" visible="true"/>
+        <item id="templates" visible="true" admin-only="true"/>
         <item id="admin" visible="true" admin-only="true"/>
         <item id="help" visible="true"/>
         <item id="profile" visible="true"/>

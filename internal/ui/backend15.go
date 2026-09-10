@@ -42,6 +42,10 @@ func (b *backend15) CreateDocument(uid, filename, parent string, stream io.Reade
 func (b *backend15) UpdateDocument(uid, docID, name, parent string) (err error) {
 	return b.blobHandler.UpdateBlobDocument(uid, docID, name, parent)
 }
+
+func (b *backend15) SetDocumentPinned(uid, docID string, pinned bool) (err error) {
+	return b.blobHandler.SetBlobDocumentPinned(uid, docID, pinned)
+}
 func (b *backend15) CreateFolder(uid, name, parent string) (doc *storage.Document, err error) {
 	return b.blobHandler.CreateBlobFolder(uid, name, parent)
 }
@@ -52,6 +56,18 @@ func (b *backend15) DeleteDocument(uid, docID string) (err error) {
 
 func (b *backend15) ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
 	return b.blobHandler.ExportPagePNG(uid, docid, pageNum)
+}
+
+func (b *backend15) ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
+	return b.blobHandler.ExportPageThumbPNG(uid, docid, pageNum)
+}
+
+func (b *backend15) ExportPageSVG(uid, docid string, pageNum int) (io.ReadCloser, error) {
+	return b.blobHandler.ExportPageSVG(uid, docid, pageNum)
+}
+
+func (b *backend15) NotebookPageCount(uid, docid string) int {
+	return b.blobHandler.NotebookPageCount(uid, docid)
 }
 
 func (b *backend15) GetEpubManifest(uid, docid string) (*epub.Manifest, error) {
@@ -72,4 +88,8 @@ func (b *backend15) GetEpubPageThumb(uid, docid string, pageIndex0 int) (io.Read
 
 func (b *backend15) Sync(uid string) {
 	b.h.NotifySync(uid, uuid.NewString())
+}
+
+func (b *backend15) GetTemplate(uid, docid string) (io.ReadCloser, error) {
+	return b.blobHandler.GetTemplate(uid, docid)
 }

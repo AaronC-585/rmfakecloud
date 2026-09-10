@@ -18,6 +18,7 @@
     integrations: "Integrations",
     connect: "Connect",
     screenshare: "Screen share",
+    templates: "Templates",
     admin: "Admin",
     help: "Help",
     profile: "Settings",

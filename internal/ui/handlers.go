@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/integrations"
 	"github.com/ddvk/rmfakecloud/internal/model"
+	"github.com/ddvk/rmfakecloud/internal/rmdecode"
 	"github.com/ddvk/rmfakecloud/internal/storage"
+	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/gin-gonic/gin"
@@ -265,6 +268,134 @@ func (app *ReactAppWrapper) codeStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": code, "active": ok})
 }
 
+func (app *ReactAppWrapper) blobStorage() blobHandler {
+	b15, ok := app.backends[common.Sync15].(*backend15)
+	if !ok || b15 == nil {
+		return nil
+	}
+	return b15.blobHandler
+}
+
+func imageContentType(b []byte) string {
+	ct := http.DetectContentType(b)
+	if strings.HasPrefix(ct, "image/") {
+		return ct
+	}
+	if len(b) > 5 && bytes.Contains(bytes.ToLower(b[:min(256, len(b))]), []byte("<svg")) {
+		return "image/svg+xml"
+	}
+	return ct
+}
+
+func writeThumbBytes(c *gin.Context, body []byte, contentType string) {
+	if len(body) == 0 {
+		return
+	}
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = imageContentType(body)
+	}
+	c.Header("Cache-Control", "private, max-age=120")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(http.StatusOK, contentType, body)
+}
+
+func (app *ReactAppWrapper) notebookCoverPage(uid, docid string) int {
+	pageNum := 1
+	if bh := app.blobStorage(); bh != nil {
+		if tree, err := bh.GetCachedTree(uid); err == nil && tree != nil {
+			if doc, err := tree.FindDoc(docid); err == nil && doc != nil {
+				pages := doc.PageCount
+				if n := bh.NotebookPageCount(uid, docid); n > pages {
+					pages = n
+				}
+				pageNum = models.ThumbPage1(doc.LastOpenedPage, pages)
+			}
+		}
+	}
+	if pageNum < 1 {
+		pageNum = 1
+	}
+	return pageNum
+}
+
+func (app *ReactAppWrapper) serveNotebookSVG(c *gin.Context, uid, docid string, pageNum int) {
+	if pageNum < 1 {
+		pageNum = 1
+	}
+	if bh := app.blobStorage(); bh != nil {
+		if rc, err := bh.ExportPageSVG(uid, docid, pageNum); err == nil && rc != nil {
+			b, rerr := io.ReadAll(rc)
+			_ = rc.Close()
+			if rerr == nil && len(b) > 0 {
+				writeThumbBytes(c, b, "image/svg+xml")
+				return
+			}
+		}
+	}
+	type pageSVGExporter interface {
+		ExportPageSVG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	}
+	if _, ok := c.Get(backendVersionKey); ok {
+		if pe, ok := app.getBackend(c).(pageSVGExporter); ok {
+			if rc, err := pe.ExportPageSVG(uid, docid, pageNum); err == nil && rc != nil {
+				b, rerr := io.ReadAll(rc)
+				_ = rc.Close()
+				if rerr == nil && len(b) > 0 {
+					writeThumbBytes(c, b, "image/svg+xml")
+					return
+				}
+			}
+		}
+	}
+	writeThumbBytes(c, []byte(rmdecode.RenderNotebookPlaceholderSVG()), "image/svg+xml")
+}
+
+func (app *ReactAppWrapper) serveNotebookThumb(c *gin.Context, uid, docid string) {
+	app.serveNotebookSVG(c, uid, docid, app.notebookCoverPage(uid, docid))
+}
+
+func (app *ReactAppWrapper) serveEpubThumb(c *gin.Context, uid, docid string) {
+	idx := 0
+	if bh := app.blobStorage(); bh != nil {
+		if tree, err := bh.GetCachedTree(uid); err == nil && tree != nil {
+			if doc, err := tree.FindDoc(docid); err == nil && doc != nil {
+				idx = doc.LastOpenedPage
+			}
+		}
+		if rc, ct, err := bh.GetEpubPageThumb(uid, docid, idx); err == nil && rc != nil {
+			b, rerr := io.ReadAll(rc)
+			_ = rc.Close()
+			if rerr == nil && len(b) > 0 {
+				writeThumbBytes(c, b, ct)
+				return
+			}
+		}
+	}
+	type epubThumbBackend interface {
+		GetEpubPageThumb(uid, docid string, pageIndex0 int) (io.ReadCloser, string, error)
+	}
+	if _, ok := c.Get(backendVersionKey); ok {
+		if eb, ok := app.getBackend(c).(epubThumbBackend); ok {
+			if rc, ct, err := eb.GetEpubPageThumb(uid, docid, idx); err == nil && rc != nil {
+				b, rerr := io.ReadAll(rc)
+				_ = rc.Close()
+				if rerr == nil && len(b) > 0 {
+					writeThumbBytes(c, b, ct)
+					return
+				}
+			}
+		}
+	}
+	rc, ct := epub.PlaceholderThumb()
+	b, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil || len(b) == 0 {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	writeThumbBytes(c, b, ct)
+}
+
 func (app *ReactAppWrapper) getBackend(c *gin.Context) backend {
 	s, ok := c.Get(backendVersionKey)
 	if !ok {
@@ -360,6 +491,69 @@ func (app *ReactAppWrapper) getDocumentPage(c *gin.Context) {
 	c.DataFromReader(http.StatusOK, -1, "image/png", reader, nil)
 }
 
+func (app *ReactAppWrapper) getDocumentPageThumb(c *gin.Context) {
+	uid := userID(c)
+	docid := common.ParamS(docIDParam, c)
+	pagenum, err := strconv.Atoi(c.Param("pagenum"))
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	app.serveAnnotatedPageThumb(c, uid, docid, pagenum)
+}
+
+func (app *ReactAppWrapper) serveAnnotatedPageThumb(c *gin.Context, uid, docid string, pageNum int) {
+	if pageNum < 1 {
+		pageNum = 1
+	}
+	type pageThumbExporter interface {
+		ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	}
+	if bh := app.blobStorage(); bh != nil {
+		type blobThumb interface {
+			ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+		}
+		if bt, ok := bh.(blobThumb); ok {
+			if rc, err := bt.ExportPageThumbPNG(uid, docid, pageNum); err == nil && rc != nil {
+				b, rerr := io.ReadAll(rc)
+				_ = rc.Close()
+				if rerr == nil && len(b) > 0 {
+					writeThumbBytes(c, b, "image/png")
+					return
+				}
+			}
+		}
+	}
+	if pe, ok := app.getBackend(c).(pageThumbExporter); ok {
+		if rc, err := pe.ExportPageThumbPNG(uid, docid, pageNum); err == nil && rc != nil {
+			b, rerr := io.ReadAll(rc)
+			_ = rc.Close()
+			if rerr == nil && len(b) > 0 {
+				writeThumbBytes(c, b, "image/png")
+				return
+			}
+		}
+	}
+	c.AbortWithStatus(http.StatusNotFound)
+}
+
+func (app *ReactAppWrapper) getNotebookThumb(c *gin.Context) {
+	app.serveNotebookThumb(c, userID(c), common.ParamS(docIDParam, c))
+}
+
+func (app *ReactAppWrapper) getNotebookPageSVG(c *gin.Context) {
+	pagenum, err := strconv.Atoi(c.Param("pagenum"))
+	if err != nil || pagenum < 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	app.serveNotebookSVG(c, userID(c), common.ParamS(docIDParam, c), pagenum)
+}
+
+func (app *ReactAppWrapper) getEpubThumb(c *gin.Context) {
+	app.serveEpubThumb(c, userID(c), common.ParamS(docIDParam, c))
+}
+
 func (app *ReactAppWrapper) getDocumentMetadata(c *gin.Context) {
 	uid := userID(c)
 	docid := common.ParamS(docIDParam, c)
@@ -389,6 +583,7 @@ func (app *ReactAppWrapper) updateDocument(c *gin.Context) {
 		badReq(c, err.Error())
 		return
 	}
+	backend.Sync(uid)
 
 	c.Status(http.StatusOK)
 }
@@ -400,7 +595,9 @@ func (app *ReactAppWrapper) deleteDocument(c *gin.Context) {
 	err := backend.DeleteDocument(uid, docid)
 	if err != nil {
 		badReq(c, err.Error())
+		return
 	}
+	backend.Sync(uid)
 	c.Status(http.StatusOK)
 }
 
@@ -421,6 +618,7 @@ func (app *ReactAppWrapper) createFolder(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	backend.Sync(uid)
 	c.JSON(http.StatusOK, doc)
 }
 

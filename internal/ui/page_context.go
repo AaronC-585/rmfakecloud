@@ -39,6 +39,16 @@ func (app *ReactAppWrapper) optionalUser(c *gin.Context) *pageUser {
 	return &pageUser{ID: claims.UserID, Email: claims.Email, Admin: admin}
 }
 
+func (app *ReactAppWrapper) requireThumbUser(c *gin.Context) *pageUser {
+	u := app.optionalUser(c)
+	if u == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return nil
+	}
+	app.hydrateAuthContext(c, u)
+	return u
+}
+
 func (app *ReactAppWrapper) requirePageUser(c *gin.Context) *pageUser {
 	u := app.optionalUser(c)
 	if u == nil {
@@ -103,17 +113,25 @@ func defaultNav(path string, admin bool) []navItem {
 		{ID: "integrations", Href: "/integrations", Label: "Integrations", Icon: "puzzle"},
 		{ID: "connect", Href: "/connect", Label: "Connect", Icon: "link"},
 		{ID: "screenshare", Href: "/screenshare", Label: "Screen share", Icon: "display"},
+		{ID: "templates", Href: "/admin/templates", Label: "Templates", Icon: "file", AdminOnly: true},
 		{ID: "admin", Href: "/admin", Label: "Admin", Icon: "gear", AdminOnly: true},
 		{ID: "help", Href: "/help", Label: "Help", Icon: "book"},
 		{ID: "profile", Href: "/profile", Label: "Profile", Icon: "person"},
 	}
-	for i := range items {
-		if items[i].Href == path || (items[i].Href != "/" && strings.HasPrefix(path, items[i].Href)) {
-			items[i].Active = true
+	if path != "" && path != "/" {
+		best := -1
+		bestLen := -1
+		for i := range items {
+			h := items[i].Href
+			if h == path || (h != "/" && strings.HasPrefix(path, h)) {
+				if len(h) > bestLen {
+					best = i
+					bestLen = len(h)
+				}
+			}
 		}
-		if path == "/" && items[i].ID == "documents" {
-			// home is not documents
-			items[i].Active = false
+		if best >= 0 {
+			items[best].Active = true
 		}
 	}
 	_ = admin

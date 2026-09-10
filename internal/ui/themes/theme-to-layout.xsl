@@ -9,6 +9,7 @@
         integrations="{icons/@integrations}"
         connect="{icons/@connect}"
         screenshare="{icons/@screenshare}"
+        templates="{icons/@templates}"
         admin="{icons/@admin}"
         profile="{icons/@profile}"
       />
@@ -24,11 +25,21 @@
         <xsl:for-each select="layout/nav/item">
           <item
             id="{@id}"
-            href="/{@id}"
             visible="{@visible}"
             admin-only="{@admin-only}"
             icon="{/theme/icons/@*[local-name()=current()/@id]}"
-          />
+          >
+            <xsl:attribute name="href">
+              <xsl:choose>
+                <xsl:when test="@id = 'templates'">/admin/templates</xsl:when>
+                <xsl:when test="@id = 'admin'">/admin</xsl:when>
+                <xsl:when test="@id = 'help'">/help</xsl:when>
+                <xsl:when test="@id = 'profile'">/profile</xsl:when>
+                <xsl:when test="@id = 'screenshare'">/screenshare</xsl:when>
+                <xsl:otherwise>/<xsl:value-of select="@id"/></xsl:otherwise>
+              </xsl:choose>
+            </xsl:attribute>
+          </item>
         </xsl:for-each>
       </nav>
       <login

@@ -25,8 +25,10 @@ type backend interface {
 	CreateDocument(uid, name, parent string, stream io.Reader) (doc *storage.Document, err error)
 	CreateFolder(uid, name, parent string) (doc *storage.Document, err error)
 	UpdateDocument(uid, docID, name, parent string) (err error)
+	SetDocumentPinned(uid, docID string, pinned bool) (err error)
 	DeleteDocument(uid, docID string) (err error)
 	Sync(uid string)
+	GetTemplate(uid, docid string) (io.ReadCloser, error)
 }
 type codeGenerator interface {
 	NewCode(string) (string, error)
@@ -47,16 +49,21 @@ type blobHandler interface {
 	GetCachedTree(uid string) (tree *models.HashTree, err error)
 	CreateBlobDocument(uid, name, parent string, reader io.Reader) (doc *storage.Document, err error)
 	UpdateBlobDocument(uid, docID, name, parent string) (err error)
+	SetBlobDocumentPinned(uid, docID string, pinned bool) error
 	DeleteBlobDocument(uid, docID string) (err error)
 	CreateBlobFolder(uid, name, parent string) (doc *storage.Document, err error)
 	Export(uid, docid string) (io.ReadCloser, error)
 	ExportRmDoc(uid, docid string) (io.ReadCloser, error)
 	ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	ExportPageThumbPNG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	ExportPageSVG(uid, docid string, pageNum int) (io.ReadCloser, error)
+	NotebookPageCount(uid, docid string) int
 	GetEpub(uid, docid string) (io.ReadCloser, error)
 	GetEpubManifest(uid, docid string) (*epub.Manifest, error)
 	GetEpubFile(uid, docid, filePath string) (io.ReadCloser, string, error)
 	GetEpubCoverThumb(uid, docid string) (io.ReadCloser, string, error)
 	GetEpubPageThumb(uid, docid string, pageIndex0 int) (io.ReadCloser, string, error)
+	GetTemplate(uid, docid string) (io.ReadCloser, error)
 }
 
 type notificationHub interface {

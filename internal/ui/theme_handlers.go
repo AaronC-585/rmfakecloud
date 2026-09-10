@@ -9,8 +9,8 @@ import (
 )
 
 type profileThemeRequest struct {
-	ThemeID              string            `json:"themeId"`
-	ThemeColorOverrides  map[string]string `json:"themeColorOverrides"`
+	ThemeID             string            `json:"themeId"`
+	ThemeColorOverrides map[string]string `json:"themeColorOverrides"`
 }
 
 type saveThemeRequest struct {
