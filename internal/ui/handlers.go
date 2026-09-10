@@ -304,6 +304,13 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 		return
 	}
 
+	if exportType == "pdf" {
+		c.Header("Content-Type", "application/pdf")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.DataFromReader(http.StatusOK, -1, "application/pdf", reader, nil)
+		return
+	}
+
 	c.DataFromReader(http.StatusOK, -1, "application/octet-stream", reader, nil)
 }
 

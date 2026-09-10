@@ -27,6 +27,8 @@ type HashDoc struct {
 	//PayloadType
 	PayloadType string
 	PageCount   int
+	// FormatLabel is a short encoding badge, e.g. "RM v6", "PDF 1.7".
+	FormatLabel string `json:"formatLabel,omitempty"`
 }
 
 // EffectivePayloadType is pdf, epub, or notebook. Ignores leftover names
@@ -39,6 +41,8 @@ func (d *HashDoc) EffectivePayloadType() string {
 		return "pdf"
 	case "epub":
 		return "epub"
+	case "template":
+		return "template"
 	case "notebook", "rm":
 		return "notebook"
 	}
@@ -53,8 +57,25 @@ func (d *HashDoc) EffectivePayloadType() string {
 		if strings.HasSuffix(n, ".epub") {
 			return "epub"
 		}
+		if strings.HasSuffix(n, ".template") {
+			return "template"
+		}
 	}
 	return "notebook"
+}
+
+// LibraryFileType is the UI/library kind: method, template, pdf, epub, or notebook.
+func (d *HashDoc) LibraryFileType() string {
+	if d == nil {
+		return "notebook"
+	}
+	if d.MetadataFile.IsMethod() {
+		return "method"
+	}
+	if d.MetadataFile.IsTemplate() {
+		return "template"
+	}
+	return d.EffectivePayloadType()
 }
 
 func NewHashDocWithMeta(documentID string, meta MetadataFile) *HashDoc {
@@ -311,6 +332,7 @@ func (d *HashDoc) Mirror(e *HashEntry, r RemoteStorage) error {
 	}
 	sort.Slice(head, func(i, j int) bool { return head[i].EntryName < head[j].EntryName })
 	d.Files = head
+	d.FormatLabel = ""
 	return nil
 
 }

@@ -14,7 +14,7 @@ const (
 	PageHeightPt = 1872
 )
 
-// RenderWritingsSVG returns a standalone SVG document with a white background and all
+// RenderWritingsSVG returns a standalone SVG document with a paper background and all
 // non-eraser strokes from a v3/v5 decoded page.
 func RenderWritingsSVG(page *rm.Rm) (string, error) {
 	if page == nil {
@@ -25,7 +25,7 @@ func RenderWritingsSVG(page *rm.Rm) (string, error) {
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d">`,
 		PageWidthPt, PageHeightPt, PageWidthPt, PageHeightPt,
 	))
-	buf.WriteString(fmt.Sprintf(`<rect width="100%%" height="100%%" fill="white"/>`))
+	buf.WriteString(`<rect width="100%" height="100%" fill="#f3efe4"/>`)
 
 	for _, layer := range page.Layers {
 		for _, line := range layer.Lines {

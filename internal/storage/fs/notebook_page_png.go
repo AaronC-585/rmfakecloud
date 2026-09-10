@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"strings"
 
-	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/rmdecode"
 	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/ddvk/rmfakecloud/internal/storage/exporter"
@@ -61,7 +59,10 @@ func readPageRmBlob(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pag
 			}
 		}
 		if pageNum > len(rms) {
-			return nil, fmt.Errorf("page %d out of range (1-%d)", pageNum, len(rms))
+			if len(rms) == 0 {
+				return nil, nil
+			}
+			pageNum = len(rms)
 		}
 		pageID = strings.TrimSuffix(path.Base(rms[pageNum-1]), storage.RmFileExt)
 	}
@@ -88,55 +89,128 @@ func readPageRmBlob(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pag
 	return nil, nil
 }
 
-func exportNotebookPagePNGWithRmdecode(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pageNum int) ([]byte, error) {
-	rmData, err := readPageRmBlob(doc, ls, docid, pageNum)
+func readDeviceThumbBytes(doc *models.HashDoc, ls *LocalBlobStorage, pageID string) []byte {
+	ent := findDeviceThumbEntry(doc, pageID)
+	if ent == nil {
+		return nil
+	}
+	rc, err := ls.GetReader(ent.Hash)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	if len(rmData) == 0 {
-		return rmdecode.RenderBlankNotebookPNG()
+	b, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil || len(b) < 32 {
+		return nil
 	}
-	b, err := rmdecode.EncodeRmPageToPNG(rmData)
-	if err != nil {
-		log.Warn("notebook page png: ", err)
-		return rmdecode.RenderBlankNotebookPNG()
-	}
-	return b, nil
+	return b
 }
 
-// ExportPagePNG renders one document page as PNG (1-based). Notebooks use the
-// Go .rm stroke renderer; the page index should be the file's last-opened page.
-func (fs *FileSystemStorage) ExportPagePNG(uid, docid string, pageNum int) (io.ReadCloser, error) {
-	if pageNum < 1 {
-		pageNum = 1
+func pageIDForNum(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pageNum int) string {
+	ids := pageIDsFromDoc(doc, ls, docid)
+	if pageNum >= 1 && pageNum <= len(ids) {
+		return ids[pageNum-1]
 	}
-	tree, err := fs.GetCachedTree(uid)
-	if err != nil {
-		return nil, err
+	return ""
+}
+
+// pageIDFromRmBlob resolves the page UUID used for sibling image paths.
+func pageIDFromRmBlob(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pageNum int) string {
+	if id := pageIDForNum(doc, ls, docid, pageNum); id != "" {
+		return id
 	}
-	doc, err := tree.FindDoc(docid)
-	if err != nil {
-		return nil, err
-	}
-	docHash := doc.Hash
-	cacheDir := fs.getPathFromUser(uid, CacheDir)
-	_ = os.MkdirAll(cacheDir, 0700)
-	safeDoc := common.Sanitize(docid)
-	cachePath := path.Join(cacheDir, "renders", safeDoc, fmt.Sprintf("page-%d-rmdecode-%s.png", pageNum, docHash))
-	if docHash != "" {
-		if r, err := os.Open(cachePath); err == nil {
-			return r, nil
+	var rms []string
+	for _, f := range doc.Files {
+		if f != nil && strings.HasSuffix(strings.ToLower(f.EntryName), storage.RmFileExt) {
+			rms = append(rms, f.EntryName)
 		}
 	}
+	if pageNum < 1 || pageNum > len(rms) {
+		return ""
+	}
+	return strings.TrimSuffix(path.Base(rms[pageNum-1]), storage.RmFileExt)
+}
 
-	ls := fs.BlobStorage(uid)
-	b, err := exportNotebookPagePNGWithRmdecode(doc, ls, docid, pageNum)
+func isPageImageExt(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif":
+		return true
+	}
+	return false
+}
+
+// readPageImages loads inserted image blobs stored beside a page as
+// {docid}/{pageID}/{filename}.png (basename → bytes for rmc staging).
+func readPageImages(doc *models.HashDoc, ls *LocalBlobStorage, pageID string) map[string][]byte {
+	pageID = strings.ToLower(strings.TrimSpace(pageID))
+	if doc == nil || ls == nil || pageID == "" {
+		return nil
+	}
+	prefix := pageID + "/"
+	out := make(map[string][]byte)
+	for _, f := range doc.Files {
+		if f == nil {
+			continue
+		}
+		name := strings.ToLower(strings.ReplaceAll(f.EntryName, "\\", "/"))
+		idx := strings.Index(name, prefix)
+		if idx < 0 {
+			continue
+		}
+		// Only accept .../{pageID}/{file} — not deeper nests or the page .rm.
+		rel := name[idx+len(prefix):]
+		if rel == "" || strings.Contains(rel, "/") || !isPageImageExt(rel) {
+			continue
+		}
+		rc, err := ls.GetReader(f.Hash)
+		if err != nil {
+			continue
+		}
+		b, err := io.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		out[path.Base(rel)] = b
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func exportNotebookPagePNGWithRmdecode(doc *models.HashDoc, ls *LocalBlobStorage, docid string, pageNum int) (png []byte, cacheable bool, err error) {
+	if pageID := pageIDForNum(doc, ls, docid, pageNum); pageID != "" {
+		if b := readDeviceThumbBytes(doc, ls, pageID); len(b) > 0 {
+			return b, true, nil
+		}
+	}
+	rmData, err := readPageRmBlob(doc, ls, docid, pageNum)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(rmData) == 0 {
+		b, e := rmdecode.RenderNotebookPlaceholderPNG()
+		return b, false, e
+	}
+	pageID := pageIDFromRmBlob(doc, ls, docid, pageNum)
+	images := readPageImages(doc, ls, pageID)
+	b, err := rmdecode.EncodeRmPageToPNGWithImages(rmData, images)
+	if err != nil {
+		log.Warn("notebook page png: ", err)
+		ph, e := rmdecode.RenderNotebookPlaceholderPNG()
+		if e != nil {
+			return nil, false, err
+		}
+		return ph, false, nil
+	}
+	return b, true, nil
+}
+
+func notebookPlaceholderReader() (io.ReadCloser, error) {
+	b, err := rmdecode.RenderNotebookPlaceholderPNG()
 	if err != nil {
 		return nil, err
-	}
-	if docHash != "" {
-		_ = os.MkdirAll(path.Dir(cachePath), 0700)
-		_ = os.WriteFile(cachePath, b, 0600)
 	}
 	return exporter.NewSeekCloser(b), nil
 }
