@@ -30,6 +30,7 @@ type backend interface {
 }
 type codeGenerator interface {
 	NewCode(string) (string, error)
+	CurrentCode(string) (string, bool)
 }
 
 type documentHandler interface {

@@ -219,11 +219,28 @@ class ApiServices {
       return r.json();
     });
   }
+  getCodeStatus() {
+    return fetch(`${constants.ROOT_URL}/code`, { credentials: "same-origin",
+      method: "GET",
+      headers: this.header(),
+    }).then((r) => {
+      handleError(r);
+      return r.json();
+    });
+  }
 
   deleteDocument(id) {
     return fetch(`${constants.ROOT_URL}/documents/${id}`, { credentials: "same-origin",
       method: "DELETE",
       headers: this.header(),
+    }).then((r) => handleError(r));
+  }
+  updateDocument(data) {
+    return fetch(`${constants.ROOT_URL}/documents`, {
+      credentials: "same-origin",
+      method: "PUT",
+      headers: this.header(),
+      body: JSON.stringify(data),
     }).then((r) => handleError(r));
   }
   download(id, exportType) {

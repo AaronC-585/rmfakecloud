@@ -248,6 +248,21 @@ func (app *ReactAppWrapper) newCode(c *gin.Context) {
 	c.JSON(http.StatusOK, code)
 }
 
+func (app *ReactAppWrapper) codeStatus(c *gin.Context) {
+	uid := userID(c)
+	user, err := app.userStorer.GetUser(uid)
+	if err != nil {
+		log.Error("Unable to find user: ", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, viewmodel.NewErrorResponse(err.Error()))
+		return
+	}
+	code, ok := app.codeConnector.CurrentCode(user.ID)
+	if !ok {
+		code = ""
+	}
+	c.JSON(http.StatusOK, gin.H{"code": code, "active": ok})
+}
+
 func (app *ReactAppWrapper) getBackend(c *gin.Context) backend {
 	s, ok := c.Get(backendVersionKey)
 	if !ok {

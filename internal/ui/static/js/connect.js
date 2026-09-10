@@ -1,10 +1,13 @@
 /**
  * Connect pairing code + live draining gauge (5 minute TTL).
+ * Polls whether the displayed code is still active; after a successful
+ * tablet pair the code is consumed and a new one is issued automatically.
  */
 (function () {
   "use strict";
 
   var CODE_TTL_MS = 5 * 60 * 1000;
+  var POLL_MS = 2000;
 
   function $(id) {
     return document.getElementById(id);
@@ -101,9 +104,9 @@
     }
     var circle = el.querySelector(".connect-gauge-circle-fill");
     if (circle) {
-      var c = parseFloat(circle.dataset.circumference || "0");
-      circle.style.strokeDashoffset = String(c * (1 - p));
-      circle.setAttribute("stroke-dashoffset", String(c * (1 - p)));
+      var circ = parseFloat(circle.dataset.circumference || "0");
+      circle.style.strokeDashoffset = String(circ * (1 - p));
+      circle.setAttribute("stroke-dashoffset", String(circ * (1 - p)));
     }
     var text = el.querySelector(".connect-gauge-label");
     if (text) text.textContent = label;
@@ -122,31 +125,86 @@
     return r.json();
   }
 
+  async function fetchCodeStatus() {
+    if (window.apiService && typeof window.apiService.getCodeStatus === "function") {
+      return window.apiService.getCodeStatus();
+    }
+    var r = await fetch("/ui/api/code", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    if (!r.ok) throw new Error(r.statusText || "Failed to check code");
+    return r.json();
+  }
+
   function init() {
     var codeEl = $("connect-code");
     var gaugeEl = $("connect-gauge");
     if (!codeEl || !gaugeEl) return;
 
+    var statusEl = $("connect-status");
     var gaugeType = (gaugeEl.getAttribute("data-gauge-type") || "circle").toLowerCase();
     if (gaugeType !== "bar") gaugeType = "circle";
     buildGauge(gaugeEl, gaugeType);
 
     var issuedAt = 0;
+    var activeCode = "";
     var busy = false;
     var raf = 0;
+    var pollTimer = 0;
+    var statusClearTimer = 0;
 
-    async function refresh() {
+    function setStatus(msg, paired) {
+      if (!statusEl) return;
+      statusEl.textContent = msg || "";
+      statusEl.hidden = !msg;
+      statusEl.classList.toggle("is-paired", !!paired);
+      if (statusClearTimer) clearTimeout(statusClearTimer);
+      if (msg && paired) {
+        statusClearTimer = setTimeout(function () {
+          statusEl.textContent = "";
+          statusEl.hidden = true;
+          statusEl.classList.remove("is-paired");
+        }, 8000);
+      }
+    }
+
+    async function refresh(opts) {
       if (busy) return;
       busy = true;
+      var paired = opts && opts.paired;
       try {
         var code = await fetchCode();
-        codeEl.textContent = typeof code === "string" ? code : String(code);
+        activeCode = typeof code === "string" ? code : String(code);
+        codeEl.textContent = activeCode;
         issuedAt = Date.now();
+        if (paired) {
+          setStatus("Device paired. New code ready for another tablet.", true);
+        }
       } catch (e) {
+        activeCode = "";
         codeEl.textContent = "········";
         console.error("[connect]", e);
       } finally {
         busy = false;
+      }
+    }
+
+    async function pollActive() {
+      if (busy || !activeCode || document.hidden) return;
+      try {
+        var st = await fetchCodeStatus();
+        var serverCode = st && st.code ? String(st.code) : "";
+        var active = !!(st && st.active && serverCode);
+        if (!active || serverCode !== activeCode) {
+          var remaining = issuedAt ? CODE_TTL_MS - (Date.now() - issuedAt) : 0;
+          // Still within TTL → code was consumed by a successful pair (or replaced elsewhere).
+          var paired = remaining > 2000;
+          await refresh({ paired: paired });
+        }
+      } catch (e) {
+        console.error("[connect] status", e);
       }
     }
 
@@ -164,14 +222,26 @@
 
     refresh();
     raf = requestAnimationFrame(frame);
+    pollTimer = setInterval(pollActive, POLL_MS);
 
     var refreshBtn = document.getElementById("connect-refresh");
-    if (refreshBtn) refreshBtn.addEventListener("click", refresh);
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function () {
+        setStatus("");
+        refresh();
+      });
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) pollActive();
+    });
 
     window.addEventListener(
       "pagehide",
       function () {
         cancelAnimationFrame(raf);
+        if (pollTimer) clearInterval(pollTimer);
+        if (statusClearTimer) clearTimeout(statusClearTimer);
       },
       { once: true }
     );

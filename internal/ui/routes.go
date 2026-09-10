@@ -86,6 +86,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	})
 
 	auth.GET("newcode", app.newCode)
+	auth.GET("code", app.codeStatus)
 
 	auth.GET("passcode/resets", app.listPasscodeResets)
 	auth.POST("passcode/resets/:uuid/approve", app.approvePasscodeReset)

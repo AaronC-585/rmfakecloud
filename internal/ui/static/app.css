@@ -585,6 +585,17 @@ textarea {
   word-break: break-all;
 }
 
+.connect-status {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--rm-fg-2);
+  font-size: 0.95rem;
+}
+
+.connect-status.is-paired {
+  color: var(--rm-accept);
+}
+
 .connect-gauge {
   color: var(--rm-connect-gauge-text);
 }

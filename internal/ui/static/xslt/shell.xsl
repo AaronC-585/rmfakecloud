@@ -346,6 +346,8 @@
               <xsl:otherwise>· · · · · · · ·</xsl:otherwise>
             </xsl:choose>
           </div>
+          <p id="connect-status" class="connect-status" role="status" aria-live="polite" hidden="hidden"/>
+
 
           <xsl:if test="$promptLoc = 'below'">
             <p>
