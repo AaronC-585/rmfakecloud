@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ddvk/rmfakecloud/internal/applog"
 	"github.com/ddvk/rmfakecloud/internal/model"
 	"github.com/ddvk/rmfakecloud/internal/storage/epub"
 	"github.com/ddvk/rmfakecloud/internal/storage/models"
@@ -521,7 +522,11 @@ func (app *ReactAppWrapper) pageAdmin(c *gin.Context) {
 		fmt.Fprintf(&b, `<user id="%s" email="%s" name="%s" admin="%s"/>`,
 			xmlAttr(usr.ID), xmlAttr(usr.Email), xmlAttr(usr.Name), admin)
 	}
-	b.WriteString(`</admin></body>`)
+	b.WriteString(`<logs>`)
+	for _, line := range applog.Default().Texts(200) {
+		fmt.Fprintf(&b, `<line>%s</line>`, esc(line))
+	}
+	b.WriteString(`</logs></admin></body>`)
 	writePageClose(&b)
 	app.renderPage(c, b.Bytes())
 }

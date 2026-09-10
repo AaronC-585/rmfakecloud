@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ddvk/rmfakecloud/internal/applog"
 	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/integrations"
 	"github.com/ddvk/rmfakecloud/internal/model"
@@ -495,6 +497,35 @@ func (app *ReactAppWrapper) getAppUsers(c *gin.Context) {
 		uilist = append(uilist, usr)
 	}
 	c.JSON(http.StatusOK, uilist)
+}
+
+func (app *ReactAppWrapper) getAdminLogs(c *gin.Context) {
+	limit := 200
+	if q := strings.TrimSpace(c.Query("limit")); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 {
+			limit = n
+			if limit > 500 {
+				limit = 500
+			}
+		}
+	}
+	lines := applog.Default().Snapshot(limit)
+	type row struct {
+		Time    string `json:"time"`
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Text    string `json:"text"`
+	}
+	out := make([]row, 0, len(lines))
+	for _, l := range lines {
+		out = append(out, row{
+			Time:    l.Time.Local().Format(time.RFC3339),
+			Level:   l.Level,
+			Message: l.Message,
+			Text:    l.Text(),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"lines": out})
 }
 
 func (app *ReactAppWrapper) getUser(c *gin.Context) {

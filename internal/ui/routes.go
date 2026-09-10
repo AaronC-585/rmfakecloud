@@ -138,6 +138,7 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	admin.PUT("users", app.updateUser)
 	admin.POST("users", app.createUser)
 	admin.GET("users", app.getAppUsers)
+	admin.GET("logs", app.getAdminLogs)
 	admin.POST("themes", app.saveTheme)
 	admin.PUT("themes/:id", app.updateTheme)
 	admin.POST("themes/:id/publish", app.publishTheme)

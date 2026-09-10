@@ -796,6 +796,17 @@
           </div>
         </form>
       </section>
+
+      <section class="admin-logs" aria-labelledby="admin-logs-heading">
+        <div class="admin-logs-head">
+          <h2 id="admin-logs-heading">Server logs</h2>
+          <p class="admin-logs-meta">
+            Recent in-memory log lines from this process (newest at the bottom).
+            <button type="button" id="admin-logs-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+          </p>
+        </div>
+        <pre id="admin-logs-view" class="admin-logs-view" tabindex="0" aria-live="polite"><xsl:for-each select="logs/line"><xsl:value-of select="."/><xsl:text>&#10;</xsl:text></xsl:for-each><xsl:if test="not(logs/line)">No log lines captured yet.</xsl:if></pre>
+      </section>
     </article>
   </xsl:template>
 
@@ -1106,6 +1117,9 @@
       </xsl:when>
       <xsl:when test="$kind = 'epub'">
         <script src="/assets/js/epubview.js" defer="defer"></script>
+      </xsl:when>
+      <xsl:when test="$kind = 'admin'">
+        <script src="/assets/js/admin-logs.js" defer="defer"></script>
       </xsl:when>
       <xsl:when test="$kind = 'themes'">
         <script src="/assets/js/theme-studio.js" defer="defer"></script>
